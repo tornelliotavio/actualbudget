@@ -225,9 +225,9 @@ The statement shown as the current bill is the latest bill whose closing
 date is on or before today. Future commitment is the sum, over later
 bills, of confirmed total when present and projected total otherwise, minus
 payments already allocated. Total commitment is the statement's remaining
-amount plus that future commitment. The October fixture is 948.25 + 275.90
-+ 195.00 + 195.00 = 1,614.15, with the account balance passed through
-unchanged.
+amount plus that future commitment. The October fixture sums to 1,614.15
+(948.25, then 275.90, 195.00 and 195.00), with the account balance passed
+through unchanged.
 
 Payments (`engine/payments.ts`) allocate a positive amount onto one bill or,
 on overflow, onto the next unpaid bill. They never create a transaction and
@@ -251,19 +251,19 @@ what an older client does with an unknown table, are in `SYNC.md`.
 
 Upstream files this module edits, each with a small additive change:
 
-| File | Change |
-| --- | --- |
-| `packages/loot-core/src/types/prefs.ts` | `creditCards` flag, schema-version pref |
-| `packages/desktop-client/src/hooks/useFeatureFlag.ts` | default off |
-| `packages/desktop-client/src/components/settings/Experimental.tsx` | toggle |
-| `packages/desktop-client/src/components/FinancesApp.tsx` | routes behind the flag |
-| `packages/desktop-client/src/components/responsive/wide.ts`, `narrow.ts` | page entries |
-| `packages/desktop-client/src/components/sidebar/PrimaryButtons.tsx` | nav item |
-| `packages/desktop-client/src/components/sidebar/redesign/PrimaryNav.tsx` | nav item |
-| `packages/desktop-client/src/components/mobile/MobileNavTabs.tsx` | nav item |
-| `packages/desktop-client/src/modals/modalsSlice.ts`, `components/Modals.tsx` | modals |
-| `packages/loot-core/src/server/main.ts`, `types/handlers.ts` | register the app (already patched for `credit-card-bills`) |
-| `packages/loot-core/src/server/sync/reset.ts` | tombstone cleanup for the new tables |
+| File                                                                           | Change                                                           |
+| ------------------------------------------------------------------------------ | ---------------------------------------------------------------- |
+| `packages/loot-core/src/types/prefs.ts`                                        | `creditCards` flag, schema-version pref                          |
+| `packages/desktop-client/src/hooks/useFeatureFlag.ts`                          | default off                                                      |
+| `packages/desktop-client/src/components/settings/Experimental.tsx`             | toggle                                                           |
+| `packages/desktop-client/src/components/FinancesApp.tsx`                       | routes behind the flag                                           |
+| `packages/desktop-client/src/components/responsive/wide.ts`, `narrow.ts`       | page entries                                                     |
+| `packages/desktop-client/src/components/sidebar/PrimaryButtons.tsx`            | nav item                                                         |
+| `packages/desktop-client/src/components/sidebar/redesign/PrimaryNav.tsx`       | nav item                                                         |
+| `packages/desktop-client/src/components/mobile/MobileNavTabs.tsx`              | nav item                                                         |
+| `packages/desktop-client/src/modals/modalsSlice.ts`, `components/Modals.tsx`   | modals                                                           |
+| `packages/loot-core/src/server/main.ts`, `types/handlers.ts`                   | register the app (already patched for `credit-card-bills`)       |
+| `packages/loot-core/src/server/sync/reset.ts`                                  | tombstone cleanup for the new tables                             |
 | `packages/sync-server/src/app-pluggyai/app-pluggyai.js`, `pluggyai-service.js` | richer bills, account credit data (already patched for `/bills`) |
 
 `sync-events.ts` is not edited. The page listens for `sync-event` itself
