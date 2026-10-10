@@ -2,6 +2,7 @@ export { assignTransaction, owedFromActual } from './assignment';
 export type { BillRef, TransactionLink } from './assignment';
 export { billStatus, computeBill } from './bills';
 export {
+  addCalendarMonths,
   applyOverride,
   assertCycleConfig,
   clampDay,

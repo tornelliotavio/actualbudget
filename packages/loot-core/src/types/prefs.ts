@@ -68,6 +68,7 @@ export type SyncedPrefs = Partial<
     | `camt-swap-payee-memo-${string}`
     | `flip-amount-${string}-${'csv' | 'qif'}`
     | `flags.${FeatureFlag}`
+    | 'credit-cards-schema-version'
     | `learn-categories`
     | `show-hidden-tags`,
     string

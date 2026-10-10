@@ -1,6 +1,7 @@
 import { describe, expect, it } from 'vitest';
 
 import {
+  addCalendarMonths,
   cycleContaining,
   dateInTimeZone,
   resolveCycle,
@@ -121,6 +122,11 @@ describe('billing cycles', () => {
       '2026-12',
       '2027-01',
     ]);
+  });
+
+  it('clamps a day that does not exist when shifting months', () => {
+    expect(addCalendarMonths('2026-01-31', 1)).toBe('2026-02-28');
+    expect(addCalendarMonths('2024-01-31', 1)).toBe('2024-02-29');
   });
 
   it('resolves the calendar date in the card timezone', () => {

@@ -188,6 +188,16 @@ export function upcomingCycles(
   return cycles;
 }
 
+/** Move a calendar date by whole months, clamping the day to the target month. */
+export function addCalendarMonths(isoDate: string, count: number): string {
+  const year = Number(isoDate.slice(0, 4));
+  const month = Number(isoDate.slice(5, 7));
+  const day = Number(isoDate.slice(8, 10));
+  const shifted = new Date(year, month - 1 + count, 1, 12);
+  const yearMonth = `${shifted.getFullYear()}-${String(shifted.getMonth() + 1).padStart(2, '0')}`;
+  return clampDay(yearMonth, day);
+}
+
 /** Calendar date of an instant in a card's timezone. Dates are `YYYY-MM-DD`. */
 export function dateInTimeZone(instant: Date, timeZone: string): string {
   const parts = new Intl.DateTimeFormat('en-CA', {
