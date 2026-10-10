@@ -19,8 +19,10 @@ import {
 } from './engine';
 import type { ChargeKind, Cycle, CycleConfig } from './engine';
 import { getPluggyAiBills } from './pluggy-bills';
+import { syncPluggyCard } from './pluggy-sync';
 import { isProjectionError, projectCard } from './project';
 import type { CardProjection } from './project';
+import { reconcileCard } from './reconcile';
 import {
   createPurchase,
   deletePayment,
@@ -70,6 +72,8 @@ export type CreditCardsHandlers = {
   'credit-cards-projection': typeof projection;
   'credit-cards-transactions': typeof transactions;
   'credit-cards-assign-transactions': typeof assignTransactions;
+  'credit-cards-sync-pluggy': typeof syncPluggy;
+  'credit-cards-reconcile': typeof reconcile;
   'pluggyai-bills': typeof getPluggyAiBills;
 };
 
@@ -593,6 +597,32 @@ async function assignTransactions(input: {
   return { assigned };
 }
 
+async function reconcile({
+  cardId,
+  today,
+}: {
+  cardId: string;
+  today?: string;
+}) {
+  const blocked = await assertCreditCardsWritable();
+  if (blocked) {
+    return blocked;
+  }
+  return reconcileCard(cardId, today);
+}
+
+async function syncPluggy({
+  cardId,
+}: {
+  cardId: string;
+}): Promise<{ bills: number; limitsUpdated: boolean } | HandlerError> {
+  const blocked = await assertCreditCardsWritable();
+  if (blocked) {
+    return blocked;
+  }
+  return syncPluggyCard(cardId);
+}
+
 export const app = createApp<CreditCardsHandlers>();
 app.method('credit-cards-list', listCards);
 app.method('credit-cards-get', getCard);
@@ -620,4 +650,6 @@ app.method(
   'credit-cards-assign-transactions',
   mutator(undoable(assignTransactions)),
 );
+app.method('credit-cards-sync-pluggy', mutator(undoable(syncPluggy)));
+app.method('credit-cards-reconcile', mutator(undoable(reconcile)));
 app.method('pluggyai-bills', getPluggyAiBills);

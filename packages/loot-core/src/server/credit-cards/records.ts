@@ -519,13 +519,24 @@ export async function listReviewItems(cardId: string): Promise<ReviewItem[]> {
 }
 
 export async function insertReviewItem(item: {
+  id?: string;
   cardId: string;
   kind: string;
   subjectId?: string | null;
   candidates?: string | null;
   createdAt: string;
 }): Promise<string> {
+  if (item.id) {
+    const existing = await db.first<{ id: string }>(
+      'SELECT id FROM credit_card_review_items WHERE id = ?',
+      [item.id],
+    );
+    if (existing) {
+      return existing.id;
+    }
+  }
   return db.insertWithUUID('credit_card_review_items', {
+    id: item.id,
     card_id: item.cardId,
     kind: item.kind,
     subject_id: item.subjectId ?? null,

@@ -329,6 +329,21 @@ app.post(
             (sum, payment) => sum + payment.amount,
             0,
           ),
+          financeCharges: (bill.financeCharges ?? []).map(charge => ({
+            id: charge.id ?? null,
+            type: charge.type ?? null,
+            amount: charge.amount ?? null,
+            currencyCode: charge.currencyCode ?? null,
+          })),
+          payments: (bill.payments ?? []).map(payment => ({
+            id: payment.id ?? null,
+            date: payment.paymentDate
+              ? getDate(new Date(payment.paymentDate))
+              : null,
+            amount: payment.amount ?? null,
+          })),
+          allowsInstallments: bill.allowsInstallments ?? null,
+          currency: bill.totalAmountCurrencyCode ?? null,
         }))
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
@@ -343,6 +358,85 @@ app.post(
     }
   }),
 );
+
+app.post(
+  '/credit-card-account',
+  handleError(async (req, res) => {
+    const { accountId } = req.body || {};
+    const fileId = req.get('X-Actual-File-Id');
+    if (!!fileId) {
+      if (!isValidFileId(fileId)) {
+        res.status(400).send({
+          status: 'error',
+          reason: 'invalid-file-id',
+          details: 'invalid fileId',
+        });
+        return;
+      }
+
+      if (!canAccessFile(fileId, res.locals.user_id)) {
+        res.status(403).send({
+          status: 'error',
+          reason: 'file-access-denied',
+          details: "You don't have permissions over this file",
+        });
+        return;
+      }
+    }
+
+    try {
+      const source = pluggyaiService.getCredentialSource(fileId);
+      if (!source) {
+        res.status(400).send({
+          status: 'error',
+          reason: 'not-configured',
+          details: 'Pluggy credentials are not configured',
+        });
+        return;
+      }
+
+      const account = await pluggyaiService.getAccountById(accountId, fileId);
+      if (account.type !== 'CREDIT') {
+        res.send({ status: 'ok', data: { creditData: null } });
+        return;
+      }
+
+      const credit = account.creditData;
+      res.send({
+        status: 'ok',
+        data: {
+          creditData: {
+            creditLimit: credit?.creditLimit ?? null,
+            availableCreditLimit: credit?.availableCreditLimit ?? null,
+            balanceCloseDate: isoDate(credit?.balanceCloseDate),
+            balanceDueDate: isoDate(credit?.balanceDueDate),
+            brand: credit?.brand ?? null,
+            status: credit?.status ?? null,
+            holderType: credit?.holderType ?? null,
+          },
+        },
+      });
+    } catch (error) {
+      res.send({
+        status: 'ok',
+        data: {
+          error: error.message,
+        },
+      });
+    }
+  }),
+);
+
+function isoDate(value) {
+  if (!value) {
+    return null;
+  }
+  const date = value instanceof Date ? value : new Date(value);
+  if (Number.isNaN(date.getTime())) {
+    return null;
+  }
+  return getDate(date);
+}
 
 function getDate(date) {
   return date.toISOString().split('T')[0];

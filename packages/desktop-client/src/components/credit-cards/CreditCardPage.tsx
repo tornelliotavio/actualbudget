@@ -18,6 +18,8 @@ import {
   useAllocatePayment,
   useCreatePurchase,
   useDeleteCreditCard,
+  useReconcileCard,
+  useSyncPluggyCard,
   useUpdateCreditCard,
 } from '#credit-cards';
 import { useFormat } from '#hooks/useFormat';
@@ -120,6 +122,7 @@ function CardDetail() {
             summary={summary}
             creditLimit={card.creditLimit}
             availableLimit={card.availableLimit}
+            provider={card.provider}
             readOnly={data.readOnly}
             assigning={assigning}
             onAssign={() => setAssigning(true)}
@@ -196,6 +199,7 @@ function Overview({
   summary,
   creditLimit,
   availableLimit,
+  provider,
   readOnly,
   assigning,
   onAssign,
@@ -219,6 +223,7 @@ function Overview({
   };
   creditLimit: number | null;
   availableLimit: number | null;
+  provider: string;
   readOnly: boolean;
   assigning: boolean;
   onAssign: () => void;
@@ -228,6 +233,8 @@ function Overview({
   const { t } = useTranslation();
   const dispatch = useDispatch();
   const queryClient = useQueryClient();
+  const syncBank = useSyncPluggyCard();
+  const reconcile = useReconcileCard();
   return (
     <View style={{ gap: 12 }}>
       <Fact label={<Trans>Current bill</Trans>}>
@@ -305,7 +312,32 @@ function Overview({
         <Button onPress={onAssign}>
           <Trans>Assign transactions</Trans>
         </Button>
+        <Button
+          isDisabled={readOnly || reconcile.isPending}
+          onPress={() => {
+            reconcile.mutate(cardId);
+          }}
+        >
+          <Trans>Reconcile</Trans>
+        </Button>
+        {provider === 'pluggyai' && (
+          <Button
+            isDisabled={readOnly || syncBank.isPending}
+            onPress={() => {
+              syncBank.mutate(cardId);
+            }}
+          >
+            <Trans>Sync from bank</Trans>
+          </Button>
+        )}
       </View>
+      {syncBank.error && <Failure message={syncBank.error.message} />}
+      {reconcile.error && <Failure message={reconcile.error.message} />}
+      {reconcile.data && reconcile.data.reviews > 0 && (
+        <Text style={{ color: theme.warningText }}>
+          <Trans>Some matches need a decision before they can be linked.</Trans>
+        </Text>
+      )}
       {assigning && (
         <AssignPanel
           cardId={cardId}

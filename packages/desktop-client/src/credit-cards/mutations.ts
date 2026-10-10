@@ -74,6 +74,24 @@ export function useAllocatePayment() {
   });
 }
 
+export function useReconcileCard() {
+  const refresh = useRefreshCards();
+  return useMutation({
+    mutationFn: (cardId: string) =>
+      send('credit-cards-reconcile', { cardId }).then(unwrap),
+    onSuccess: refresh,
+  });
+}
+
+export function useSyncPluggyCard() {
+  const refresh = useRefreshCards();
+  return useMutation({
+    mutationFn: (cardId: string) =>
+      send('credit-cards-sync-pluggy', { cardId }).then(unwrap),
+    onSuccess: refresh,
+  });
+}
+
 export function useAssignTransactions() {
   const refresh = useRefreshCards();
   return useMutation({
