@@ -14,4 +14,8 @@ export { MobilePayeesPage as Payees } from '#components/mobile/payees/MobilePaye
 export { MobilePayeeEditPage as PayeeEdit } from '#components/mobile/payees/MobilePayeeEditPage';
 
 export { MobileBankSyncPage as BankSync } from '#components/mobile/banksync/MobileBankSyncPage';
+
+export { CreditCardsPage as CreditCards } from '#components/credit-cards/CreditCardsPage';
+export { CreditCardPage as CreditCard } from '#components/credit-cards/CreditCardPage';
+export { BillPage as CreditCardBill } from '#components/credit-cards/BillPage';
 export { MobileBankSyncAccountEditPage as BankSyncAccountEdit } from '#components/mobile/banksync/MobileBankSyncAccountEditPage';

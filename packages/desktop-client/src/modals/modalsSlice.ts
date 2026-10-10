@@ -686,6 +686,9 @@ export type Modal =
         templates: Template[];
         cleanup: CleanupTemplate[];
       };
+    }
+  | {
+      name: 'credit-card-create';
     };
 
 type OpenAccountCloseModalPayload = {

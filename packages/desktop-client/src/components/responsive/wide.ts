@@ -15,6 +15,10 @@ export { ManagePayeesPage as PayeeEdit } from '#components/payees/ManagePayeesPa
 
 export { BankSync } from '#components/banksync';
 
+export { CreditCardsPage as CreditCards } from '#components/credit-cards/CreditCardsPage';
+export { CreditCardPage as CreditCard } from '#components/credit-cards/CreditCardPage';
+export { BillPage as CreditCardBill } from '#components/credit-cards/BillPage';
+
 export { UserDirectoryPage } from '#components/admin/UserDirectory/UserDirectoryPage';
 
 // Account component is currently used for uncategorized transactions view.

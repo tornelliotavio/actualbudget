@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import {
+  SvgCreditCard,
   SvgLibrary,
   SvgReports,
   SvgTag,
@@ -12,6 +13,7 @@ import { SvgCalendar3 } from '@actual-app/components/icons/v2';
 import { spacing } from '@actual-app/components/tokens';
 import { View } from '@actual-app/components/view';
 
+import { useFeatureFlag } from '#hooks/useFeatureFlag';
 import { useIsTestEnv } from '#hooks/useIsTestEnv';
 import { useSyncServerStatus } from '#hooks/useSyncServerStatus';
 
@@ -22,6 +24,7 @@ export function PrimaryNav() {
   const syncServerStatus = useSyncServerStatus();
   const isTestEnv = useIsTestEnv();
   const isUsingServer = syncServerStatus !== 'no-server' || isTestEnv;
+  const creditCardsEnabled = useFeatureFlag('creditCards');
 
   return (
     <View
@@ -34,6 +37,13 @@ export function PrimaryNav() {
       <NavRow title={t('Budget')} Icon={SvgWallet} to="/budget" />
       <NavRow title={t('Reports')} Icon={SvgReports} to="/reports" />
       <NavRow title={t('Schedules')} Icon={SvgCalendar3} to="/schedules" />
+      {creditCardsEnabled && (
+        <NavRow
+          title={t('Credit cards')}
+          Icon={SvgCreditCard}
+          to="/credit-cards"
+        />
+      )}
       <NavRow title={t('Payees')} Icon={SvgUserGroup} to="/payees" />
       <NavRow title={t('Rules')} Icon={SvgTuning} to="/rules" />
       {isUsingServer && (

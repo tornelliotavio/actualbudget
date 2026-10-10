@@ -25,6 +25,7 @@
     "#spreadsheet": "./src/spreadsheet/index.ts",
     "#style": "./src/style/index.ts",
     "#tags": "./src/tags/index.ts",
+    "#credit-cards": "./src/credit-cards/index.ts",
     "#transactions": "./src/transactions/index.ts",
     "#undo": "./src/undo/index.ts",
     "#global-events": "./src/global-events.ts",

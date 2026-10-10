@@ -14,6 +14,7 @@ import {
   addCalendarMonths,
   billId,
   importRecordId,
+  parseInstallmentLabel,
   upcomingCycles,
 } from './engine';
 import type { ChargeKind, Cycle, CycleConfig } from './engine';
@@ -27,6 +28,7 @@ import {
   findPurchase,
   getCardTransaction,
   insertReviewItem,
+  listCardTransactions,
   listPayments,
   listReviewItems,
   resolveReviewItem,
@@ -65,6 +67,9 @@ export type CreditCardsHandlers = {
   'credit-cards-add-review': typeof addReview;
   'credit-cards-resolve-review': typeof resolveReview;
   'credit-cards-import-record': typeof rememberImport;
+  'credit-cards-projection': typeof projection;
+  'credit-cards-transactions': typeof transactions;
+  'credit-cards-assign-transactions': typeof assignTransactions;
   'pluggyai-bills': typeof getPluggyAiBills;
 };
 
@@ -489,6 +494,105 @@ async function rememberImport(input: {
   return { id };
 }
 
+async function projection({
+  cardId,
+  today,
+}: {
+  cardId: string;
+  today?: string;
+}): Promise<CardProjection | HandlerError> {
+  return loadProjection(cardId, today);
+}
+
+async function transactions({ cardId }: { cardId: string }): Promise<
+  | Array<{
+      id: string;
+      date: string;
+      amount: number;
+      notes: string | null;
+      payeeName: string | null;
+      transferId: string | null;
+    }>
+  | HandlerError
+> {
+  const card = await getCreditCardRow(cardId);
+  if (!card) {
+    return { error: 'not-found' };
+  }
+  const rows = await listCardTransactions(card.accountId);
+  return rows
+    .filter(row => !row.isParent && !row.startingBalance)
+    .map(row => ({
+      id: row.id,
+      date: row.date,
+      amount: row.amount,
+      notes: row.notes,
+      payeeName: row.payeeName,
+      transferId: row.transferId,
+    }));
+}
+
+async function assignTransactions(input: {
+  cardId: string;
+  billId: string;
+  transactionIds: string[];
+}): Promise<
+  | {
+      assigned: Array<{
+        id: string;
+        kind: ChargeKind;
+        installmentNumber: number | null;
+        totalInstallments: number | null;
+      }>;
+    }
+  | HandlerError
+> {
+  const blocked = await assertCreditCardsWritable();
+  if (blocked) {
+    return blocked;
+  }
+  const card = await getCreditCardRow(input.cardId);
+  if (!card) {
+    return { error: 'not-found' };
+  }
+  const assigned: Array<{
+    id: string;
+    kind: ChargeKind;
+    installmentNumber: number | null;
+    totalInstallments: number | null;
+  }> = [];
+  for (const transactionId of input.transactionIds) {
+    const transaction = await getCardTransaction(card.accountId, transactionId);
+    if (!transaction || transaction.transferId) {
+      continue;
+    }
+    const label = parseInstallmentLabel(
+      `${transaction.payeeName ?? ''} ${transaction.notes ?? ''}`,
+    );
+    let kind: ChargeKind = 'purchase';
+    if (label) {
+      kind = 'installment';
+    } else if (transaction.amount > 0) {
+      kind = 'refund';
+    }
+    await upsertLink({
+      id: transaction.id,
+      transactionId: transaction.id,
+      cardId: card.id,
+      billId: input.billId,
+      kind,
+      source: 'manual',
+    });
+    assigned.push({
+      id: transaction.id,
+      kind,
+      installmentNumber: label?.number ?? null,
+      totalInstallments: label?.total ?? null,
+    });
+  }
+  return { assigned };
+}
+
 export const app = createApp<CreditCardsHandlers>();
 app.method('credit-cards-list', listCards);
 app.method('credit-cards-get', getCard);
@@ -510,4 +614,10 @@ app.method('credit-cards-reviews', reviews);
 app.method('credit-cards-add-review', mutator(undoable(addReview)));
 app.method('credit-cards-resolve-review', mutator(undoable(resolveReview)));
 app.method('credit-cards-import-record', mutator(undoable(rememberImport)));
+app.method('credit-cards-projection', projection);
+app.method('credit-cards-transactions', transactions);
+app.method(
+  'credit-cards-assign-transactions',
+  mutator(undoable(assignTransactions)),
+);
 app.method('pluggyai-bills', getPluggyAiBills);

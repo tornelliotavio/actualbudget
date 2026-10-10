@@ -126,6 +126,38 @@ describe('credit card ledger', () => {
 
     const still = await db.all('SELECT id FROM transactions');
     expect(still).toHaveLength(before.length + 2);
+
+    const extra = await db.insertTransaction({
+      account: accountId,
+      date: '2017-01-06',
+      amount: -19500,
+      notes: 'STORE PARC 02/06',
+    });
+    const assigned = await app.handlers['credit-cards-assign-transactions']({
+      cardId: created.id,
+      billId: january,
+      transactionIds: [extra],
+    });
+    if ('error' in assigned) {
+      throw new Error(assigned.error);
+    }
+    expect(assigned.assigned).toEqual([
+      {
+        id: extra,
+        kind: 'installment',
+        installmentNumber: 2,
+        totalInstallments: 6,
+      },
+    ]);
+    const moved = await app.handlers['credit-cards-bill']({
+      cardId: created.id,
+      billId: january,
+      today,
+    });
+    if ('error' in moved) {
+      throw new Error(moved.error);
+    }
+    expect(moved.bill.computedTotal).toBe(94825 + 19500);
   });
 
   it('keeps the module readable when a newer schema is stored', async () => {

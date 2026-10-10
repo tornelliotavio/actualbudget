@@ -38,6 +38,7 @@ import type {
   CardTransaction,
   StoredBill,
   StoredInstallment,
+  StoredPayment,
   StoredPurchase,
 } from './records';
 import { creditCardsAccess } from './schema-version';
@@ -66,6 +67,7 @@ export type CardProjection = {
   summary: CardSummary;
   purchases: StoredPurchase[];
   installments: StoredInstallment[];
+  payments: StoredPayment[];
   unlinkedPayments: UnlinkedPayment[];
   readOnly: boolean;
 };
@@ -362,6 +364,7 @@ export async function projectCard(
     }),
     purchases,
     installments,
+    payments,
     unlinkedPayments,
     readOnly: access.readOnly,
   };

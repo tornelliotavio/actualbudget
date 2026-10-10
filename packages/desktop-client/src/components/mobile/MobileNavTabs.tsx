@@ -21,6 +21,7 @@ import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 import { useDrag } from '@use-gesture/react';
 
+import { useFeatureFlag } from '#hooks/useFeatureFlag';
 import { useIsTestEnv } from '#hooks/useIsTestEnv';
 import { useScrollListener } from '#hooks/useScrollListener';
 import { useSyncServerStatus } from '#hooks/useSyncServerStatus';
@@ -41,6 +42,7 @@ export function MobileNavTabs() {
   const syncServerStatus = useSyncServerStatus();
   const isTestEnv = useIsTestEnv();
   const isUsingServer = syncServerStatus !== 'no-server' || isTestEnv;
+  const creditCardsEnabled = useFeatureFlag('creditCards');
   const [navbarState, setNavbarState] = useState<'default' | 'open' | 'hidden'>(
     'default',
   );
@@ -123,6 +125,16 @@ export function MobileNavTabs() {
       style: navTabStyle,
       Icon: SvgCalendar3,
     },
+    ...(creditCardsEnabled
+      ? [
+          {
+            name: t('Credit cards'),
+            path: '/credit-cards',
+            style: navTabStyle,
+            Icon: SvgCreditCard,
+          },
+        ]
+      : []),
     {
       name: t('Payees'),
       path: '/payees',

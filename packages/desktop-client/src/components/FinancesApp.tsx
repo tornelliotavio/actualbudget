@@ -414,6 +414,40 @@ export function FinancesApp() {
                     />
 
                     <Route
+                      path="/credit-cards"
+                      element={
+                        <ErrorBoundary
+                          FallbackComponent={FeatureErrorFallback}
+                          resetKeys={[location.pathname]}
+                        >
+                          <NarrowAlternate name="CreditCards" />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="/credit-cards/:id"
+                      element={
+                        <ErrorBoundary
+                          FallbackComponent={FeatureErrorFallback}
+                          resetKeys={[location.pathname]}
+                        >
+                          <NarrowAlternate name="CreditCard" />
+                        </ErrorBoundary>
+                      }
+                    />
+                    <Route
+                      path="/credit-cards/:id/bills/:referenceMonth"
+                      element={
+                        <ErrorBoundary
+                          FallbackComponent={FeatureErrorFallback}
+                          resetKeys={[location.pathname]}
+                        >
+                          <NarrowAlternate name="CreditCardBill" />
+                        </ErrorBoundary>
+                      }
+                    />
+
+                    <Route
                       path="/transactions/:transactionId"
                       element={
                         <ErrorBoundary
