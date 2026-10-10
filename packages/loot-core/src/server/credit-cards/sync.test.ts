@@ -14,6 +14,7 @@ import * as mockSyncServer from '#server/tests/mockSyncServer';
 
 import { app } from './app';
 import { isCreditCardError } from './cards';
+import { billId } from './engine';
 
 type TestGlobals = typeof globalThis & {
   emptyDatabase: (avoidUpdate?: boolean) => () => Promise<void>;
@@ -200,7 +201,15 @@ describe('credit card sync', () => {
   });
 
   it('survives a database export and reopen', async () => {
-    await createCard('Itaú');
+    const card = await createCard('Itaú');
+    const confirmed = await app.handlers['credit-cards-confirm-bill']({
+      cardId: card.id,
+      referenceMonth: '2017-01',
+      confirmedTotal: 94825,
+    });
+    if ('error' in confirmed) {
+      throw new Error(confirmed.error);
+    }
     const dir = fs.mkdtempSync(path.join(os.tmpdir(), 'actual-credit-cards-'));
     const previous = process.env.ACTUAL_DATA_DIR;
     process.env.ACTUAL_DATA_DIR = dir;
@@ -222,8 +231,17 @@ describe('credit card sync', () => {
         [],
         true,
       ) as unknown as Array<{ name: string }>;
+      const bills = sqlite.runQuery(
+        copy,
+        'SELECT id, confirmed_total FROM credit_card_bills WHERE tombstone = 0',
+        [],
+        true,
+      ) as unknown as Array<{ id: string; confirmed_total: number }>;
       sqlite.closeDatabase(copy);
       expect(rows.map(row => row.name)).toEqual(['Itaú']);
+      expect(bills).toEqual([
+        { id: billId(card.id, '2017-01'), confirmed_total: 94825 },
+      ]);
     } finally {
       if (previous === undefined) {
         delete process.env.ACTUAL_DATA_DIR;

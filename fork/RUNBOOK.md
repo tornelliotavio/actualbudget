@@ -360,3 +360,22 @@ build never typechecks, so deploys are unaffected.
 Test writes against a throwaway sync server rather than production: start
 `packages/sync-server/build/app.js` with a temporary `ACTUAL_DATA_DIR`, bootstrap
 it, import a backup zip with the API, and upload it.
+
+---
+
+## 5. Credit cards
+
+The module is merged with the `creditCards` flag off. Migrations
+`1791656900000_credit_cards.sql` and `1791656901000_credit_card_details.sql`
+run on every budget this fork opens. They only add tables. Account balances
+stay the sum of `transactions`.
+
+Do not fast-forward `deploy` for this until a backup of "Duarte Finances" is
+exported and tagged `pre-credit-cards/deploy`. Rolling the image back does not
+undo the tables. `fork/credit-cards/RECOVERY.md` is the procedure, including
+the two `__migrations__` ids to delete on a backup copy if a stock build
+reports `out-of-sync-migrations`.
+
+The module never runs Reset Sync or deletes transactions. Projected
+installments are calculated, not posted. "Sync from bank" writes bill totals
+and limits only.

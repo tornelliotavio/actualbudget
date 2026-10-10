@@ -48,8 +48,8 @@ migration that stock build knows about is already applied. Two cases:
 
      ```sql
      DELETE FROM __migrations__ WHERE id IN (
-       <credit_cards migration id>,
-       <credit_card_details migration id>
+       1791656900000,
+       1791656901000
      );
      ```
 
