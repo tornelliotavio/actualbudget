@@ -1,8 +1,9 @@
 import { useState } from 'react';
-import { Trans } from 'react-i18next';
+import { Trans, useTranslation } from 'react-i18next';
 
 import { Button } from '@actual-app/components/button';
 import { Paragraph } from '@actual-app/components/paragraph';
+import { Select } from '@actual-app/components/select';
 import { Text } from '@actual-app/components/text';
 import { View } from '@actual-app/components/view';
 import { useQuery } from '@tanstack/react-query';
@@ -24,6 +25,7 @@ export function AssignPanel({
   defaultMonth,
   readOnly,
 }: AssignPanelProps) {
+  const { t } = useTranslation();
   const transactions = useQuery(creditCardQueries.transactions(cardId));
   const assign = useAssignTransactions();
   const [month, setMonth] = useState(defaultMonth ?? months[0] ?? '');
@@ -47,17 +49,13 @@ export function AssignPanel({
         <Text>
           <Trans>Bill month</Trans>
         </Text>
-        <select
+        <Select
+          options={months.map(item => [item, item] as const)}
           value={month}
-          onChange={event => setMonth(event.currentTarget.value)}
-          style={{ display: 'block', marginTop: 4, height: 32 }}
-        >
-          {months.map(item => (
-            <option key={item} value={item}>
-              {item}
-            </option>
-          ))}
-        </select>
+          defaultLabel={t('Choose a bill')}
+          onChange={setMonth}
+          style={{ width: '100%', marginTop: 4 }}
+        />
       </label>
       {rows.map(transaction => {
         const checked = selected.includes(transaction.id);

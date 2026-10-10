@@ -6,6 +6,7 @@ import { Link, useParams } from 'react-router';
 import { Button } from '@actual-app/components/button';
 import { Input } from '@actual-app/components/input';
 import { Paragraph } from '@actual-app/components/paragraph';
+import { Select } from '@actual-app/components/select';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
@@ -525,6 +526,7 @@ function Payments({
   }>;
   readOnly: boolean;
 }) {
+  const { t } = useTranslation();
   const allocate = useAllocatePayment();
   const [billId, setBillId] = useState(bills[0]?.id ?? '');
   return (
@@ -535,17 +537,13 @@ function Payments({
           a new expense.
         </Trans>
       </Paragraph>
-      <select
+      <Select
+        options={bills.map(bill => [bill.id, bill.referenceMonth] as const)}
         value={billId}
-        onChange={event => setBillId(event.currentTarget.value)}
-        style={{ height: 32 }}
-      >
-        {bills.map(bill => (
-          <option key={bill.id} value={bill.id}>
-            {bill.referenceMonth}
-          </option>
-        ))}
-      </select>
+        defaultLabel={t('Choose a bill')}
+        onChange={setBillId}
+        style={{ width: '100%' }}
+      />
       {unlinked.map(payment => (
         <View key={payment.id} style={{ flexDirection: 'row', gap: 8 }}>
           <Text>{payment.date}</Text>
@@ -598,6 +596,7 @@ function Settings({
   };
   readOnly: boolean;
 }) {
+  const { t } = useTranslation();
   const format = useFormat();
   const navigate = useNavigate();
   const update = useUpdateCreditCard();
@@ -617,18 +616,15 @@ function Settings({
       <Input value={name} onChangeValue={setName} />
       <Input value={closingDay} onChangeValue={setClosingDay} />
       <Input value={dueDay} onChangeValue={setDueDay} />
-      <select
+      <Select
+        options={[
+          ['next', t('Goes on the next bill')],
+          ['current', t('Stays on this bill')],
+        ]}
         value={policy}
-        onChange={event => {
-          const next = event.currentTarget.value;
-          if (next === 'current' || next === 'next') {
-            setPolicy(next);
-          }
-        }}
-        style={{ height: 32 }}
-      >
-        <PolicyOptions />
-      </select>
+        onChange={setPolicy}
+        style={{ width: '100%' }}
+      />
       <Input value={limit} onChangeValue={setLimit} />
       <Input value={available} onChangeValue={setAvailable} />
       {update.error && <Failure message={update.error.message} />}
@@ -672,18 +668,5 @@ function Settings({
         </Trans>
       </Paragraph>
     </View>
-  );
-}
-
-function PolicyOptions() {
-  return (
-    <>
-      <option value="next">
-        <Trans>Goes on the next bill</Trans>
-      </option>
-      <option value="current">
-        <Trans>Stays on this bill</Trans>
-      </option>
-    </>
   );
 }

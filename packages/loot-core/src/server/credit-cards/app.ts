@@ -19,7 +19,7 @@ import {
 } from './engine';
 import type { ChargeKind, Cycle, CycleConfig } from './engine';
 import { getPluggyAiBills } from './pluggy-bills';
-import { syncPluggyCard } from './pluggy-sync';
+import { previewPluggyAccount, syncPluggyCard } from './pluggy-sync';
 import { isProjectionError, projectCard } from './project';
 import type { CardProjection } from './project';
 import { reconcileCard } from './reconcile';
@@ -73,6 +73,7 @@ export type CreditCardsHandlers = {
   'credit-cards-transactions': typeof transactions;
   'credit-cards-assign-transactions': typeof assignTransactions;
   'credit-cards-sync-pluggy': typeof syncPluggy;
+  'credit-cards-preview-account': typeof previewAccount;
   'credit-cards-reconcile': typeof reconcile;
   'pluggyai-bills': typeof getPluggyAiBills;
 };
@@ -611,6 +612,10 @@ async function reconcile({
   return reconcileCard(cardId, today);
 }
 
+async function previewAccount({ accountId }: { accountId: string }) {
+  return previewPluggyAccount({ accountId });
+}
+
 async function syncPluggy({
   cardId,
 }: {
@@ -650,6 +655,7 @@ app.method(
   'credit-cards-assign-transactions',
   mutator(undoable(assignTransactions)),
 );
+app.method('credit-cards-preview-account', previewAccount);
 app.method('credit-cards-sync-pluggy', mutator(undoable(syncPluggy)));
 app.method('credit-cards-reconcile', mutator(undoable(reconcile)));
 app.method('pluggyai-bills', getPluggyAiBills);

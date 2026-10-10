@@ -6,7 +6,7 @@ import { setSyncingMode } from '#server/sync';
 import { app } from './app';
 import { isCreditCardError } from './cards';
 import { billId } from './engine';
-import { applyPluggyCardSnapshot } from './pluggy-sync';
+import { applyPluggyCardSnapshot, dayFromBankDate } from './pluggy-sync';
 
 async function emptyDatabase(): Promise<void> {
   const globals = globalThis as typeof globalThis & {
@@ -126,5 +126,31 @@ describe('pluggy card sync', () => {
 
     const after = await db.all('SELECT id FROM transactions');
     expect(after).toHaveLength(before.length + 1);
+  });
+
+  it('reads the day from a bank date and ignores anything else', () => {
+    expect(dayFromBankDate('2017-01-10')).toBe(10);
+    expect(dayFromBankDate('2017-01-31T00:00:00.000Z')).toBe(31);
+    expect(dayFromBankDate(null)).toBeNull();
+    expect(dayFromBankDate('2017-01')).toBeNull();
+  });
+
+  it('does not treat a manual account as a bank card', async () => {
+    const accountId = await db.insertAccount({
+      name: 'Renner',
+      offbudget: 0,
+    });
+    const preview = await app.handlers['credit-cards-preview-account']({
+      accountId,
+    });
+    expect(preview).toEqual({
+      linked: false,
+      providerAccountId: null,
+      closingDay: null,
+      dueDay: null,
+      creditLimit: null,
+      availableLimit: null,
+      brand: null,
+    });
   });
 });

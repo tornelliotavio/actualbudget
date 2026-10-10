@@ -1,8 +1,10 @@
 import * as asyncStorage from '#platform/server/asyncStorage';
+import * as db from '#server/db';
 import { post } from '#server/post';
 import { getPrefs } from '#server/prefs';
 import { getServer } from '#server/server-config';
 import { amountToInteger } from '#shared/util';
+import type { IntegerAmount } from '#shared/util';
 
 import { getCreditCardRow, updateCreditCard } from './cards';
 import {
@@ -36,7 +38,28 @@ export type PluggyCreditSnapshot = {
 
 type HandlerError = { error: string };
 
-function cents(value: number | null): number | null {
+export type AccountPreview = {
+  linked: boolean;
+  providerAccountId: string | null;
+  closingDay: number | null;
+  dueDay: number | null;
+  creditLimit: IntegerAmount | null;
+  availableLimit: IntegerAmount | null;
+  brand: string | null;
+};
+
+export function dayFromBankDate(value: string | null): number | null {
+  if (!value || !/^\d{4}-\d{2}-\d{2}/.test(value)) {
+    return null;
+  }
+  const day = Number(value.slice(8, 10));
+  if (!Number.isInteger(day) || day < 1 || day > 31) {
+    return null;
+  }
+  return day;
+}
+
+function cents(value: number | null): IntegerAmount | null {
   if (value == null || !Number.isFinite(value)) {
     return null;
   }
@@ -165,17 +188,10 @@ type AccountResponse = {
   error?: string;
 };
 
-export async function syncPluggyCard(
-  cardId: string,
-): Promise<{ bills: number; limitsUpdated: boolean } | HandlerError> {
-  const card = await getCreditCardRow(cardId);
-  if (!card) {
-    return { error: 'not-found' };
-  }
-  if (card.provider !== 'pluggyai' || !card.providerAccountId) {
-    return { error: 'not-linked' };
-  }
-
+async function pluggyRequest<T extends { error?: string }>(
+  path: string,
+  providerAccountId: string,
+): Promise<T | HandlerError> {
   const userToken = await asyncStorage.getItem('user-token');
   if (!userToken) {
     return { error: 'unauthorized' };
@@ -189,36 +205,102 @@ export async function syncPluggyCard(
     'X-ACTUAL-TOKEN': userToken,
     ...(fileId ? { 'X-Actual-File-Id': fileId } : {}),
   };
-  const body = { accountId: card.providerAccountId };
-
-  let bills: BillsResponse;
-  let account: AccountResponse;
   try {
-    bills = await post(
-      serverConfig.PLUGGYAI_SERVER + '/bills',
-      body,
+    return (await post(
+      serverConfig.PLUGGYAI_SERVER + path,
+      { accountId: providerAccountId },
       headers,
       60000,
-    );
-    account = await post(
-      serverConfig.PLUGGYAI_SERVER + '/credit-card-account',
-      body,
-      headers,
-      60000,
-    );
+    )) as T;
   } catch (error) {
     return { error: error instanceof Error ? error.message : String(error) };
   }
-  if (bills.error) {
-    return { error: bills.error };
+}
+
+function requestError(value: { error?: string }): string | null {
+  if (typeof value.error === 'string' && value.error !== '') {
+    return value.error;
   }
-  if (account.error) {
-    return { error: account.error };
+  return null;
+}
+
+export async function previewPluggyAccount({
+  accountId,
+}: {
+  accountId: string;
+}): Promise<AccountPreview | HandlerError> {
+  const account = await db.first<{
+    account_id: string | null;
+    account_sync_source: string | null;
+  }>(
+    'SELECT account_id, account_sync_source FROM accounts WHERE id = ? AND tombstone = 0',
+    [accountId],
+  );
+  if (account?.account_sync_source !== 'pluggyai' || !account.account_id) {
+    return {
+      linked: false,
+      providerAccountId: null,
+      closingDay: null,
+      dueDay: null,
+      creditLimit: null,
+      availableLimit: null,
+      brand: null,
+    };
   }
+
+  const response = await pluggyRequest<AccountResponse>(
+    '/credit-card-account',
+    account.account_id,
+  );
+  const failure = requestError(response);
+  if (failure) {
+    return { error: failure };
+  }
+  const credit = (response as AccountResponse).creditData ?? null;
+  return {
+    linked: true,
+    providerAccountId: account.account_id,
+    closingDay: dayFromBankDate(credit?.balanceCloseDate ?? null),
+    dueDay: dayFromBankDate(credit?.balanceDueDate ?? null),
+    creditLimit: cents(credit?.creditLimit ?? null),
+    availableLimit: cents(credit?.availableCreditLimit ?? null),
+    brand: credit?.brand ?? null,
+  };
+}
+
+export async function syncPluggyCard(
+  cardId: string,
+): Promise<{ bills: number; limitsUpdated: boolean } | HandlerError> {
+  const card = await getCreditCardRow(cardId);
+  if (!card) {
+    return { error: 'not-found' };
+  }
+  if (card.provider !== 'pluggyai' || !card.providerAccountId) {
+    return { error: 'not-linked' };
+  }
+
+  const bills = await pluggyRequest<BillsResponse>(
+    '/bills',
+    card.providerAccountId,
+  );
+  const billsError = requestError(bills);
+  if (billsError) {
+    return { error: billsError };
+  }
+  const account = await pluggyRequest<AccountResponse>(
+    '/credit-card-account',
+    card.providerAccountId,
+  );
+  const accountError = requestError(account);
+  if (accountError) {
+    return { error: accountError };
+  }
+  const billData = bills as BillsResponse;
+  const accountData = account as AccountResponse;
 
   return applyPluggyCardSnapshot({
     cardId,
-    bills: (bills.bills ?? []).map(bill => ({
+    bills: (billData.bills ?? []).map(bill => ({
       id: bill.id,
       dueDate: bill.dueDate,
       totalAmount: bill.totalAmount,
@@ -226,6 +308,6 @@ export async function syncPluggyCard(
       allowsInstallments: bill.allowsInstallments ?? null,
       currency: bill.currency ?? null,
     })),
-    credit: account.creditData ?? null,
+    credit: accountData.creditData ?? null,
   });
 }
