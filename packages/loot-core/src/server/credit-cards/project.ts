@@ -7,6 +7,7 @@ import {
   assignTransaction,
   billId,
   computeBill,
+  installmentId,
   owedFromActual,
   readCardMetadata,
   resolveCycle,
@@ -25,6 +26,10 @@ import type {
   CycleOverride,
   DataSource,
 } from './engine';
+import {
+  planInstallments,
+  unpostedInstallments,
+} from './engine/installment-plans';
 import {
   installmentDate,
   listCardTransactions,
@@ -310,6 +315,74 @@ export async function projectCard(
     });
   }
 
+  const extraPurchases: StoredPurchase[] = [];
+  const extraInstallments: StoredInstallment[] = [];
+  const planned = planInstallments(card.id, transactions);
+  for (const plan of planned.plans) {
+    if (purchasesById.has(plan.id)) {
+      continue;
+    }
+    const alreadyStored = plan.parts.some(
+      part =>
+        part.transactionId != null &&
+        installmentByTransaction.has(part.transactionId),
+    );
+    if (alreadyStored) {
+      continue;
+    }
+    extraPurchases.push({
+      id: plan.id,
+      cardId: plan.cardId,
+      purchaseDate: plan.purchaseDate,
+      merchant: plan.merchant,
+      description: plan.notes,
+      totalAmount: plan.totalAmount,
+      installmentCount: plan.installmentCount,
+      categoryId: null,
+      providerPurchaseKey: plan.id,
+      source: 'pluggyai',
+      status: 'open',
+    });
+    const future = new Set(unpostedInstallments(plan).map(part => part.number));
+    for (const part of plan.parts) {
+      if (part.transactionId == null && !future.has(part.number)) {
+        continue;
+      }
+      const id = installmentId(plan.id, part.number);
+      extraInstallments.push({
+        id,
+        purchaseId: plan.id,
+        installmentNumber: part.number,
+        totalInstallments: plan.installmentCount,
+        amount: part.amount,
+        billIdOverride: null,
+        transactionId: part.transactionId,
+        providerTransactionId: part.transactionId,
+        status: part.transactionId == null ? 'projected' : 'imported',
+      });
+      if (part.transactionId != null) {
+        continue;
+      }
+      const cycle = resolveCycle(part.date, config, overrides);
+      const bucket = ensure(cycle);
+      bucket.charges.push({
+        id,
+        owedAmount: part.amount,
+        projected: true,
+        kind: 'installment',
+      });
+      bucket.lines.push({
+        id,
+        date: part.date,
+        description: plan.merchant || plan.notes || plan.description,
+        owedAmount: part.amount,
+        projected: true,
+        kind: 'installment',
+        source: 'projected',
+      });
+    }
+  }
+
   for (const payment of payments) {
     const referenceMonth = payment.billId.split(':').slice(1).join(':');
     const bucket = buckets.get(referenceMonth);
@@ -362,8 +435,8 @@ export async function projectCard(
       creditLimit: card.creditLimit,
       availableLimit: card.availableLimit,
     }),
-    purchases,
-    installments,
+    purchases: [...purchases, ...extraPurchases],
+    installments: [...installments, ...extraInstallments],
     payments,
     unlinkedPayments,
     readOnly: access.readOnly,

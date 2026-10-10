@@ -22,6 +22,17 @@ export const creditCardQueries = {
         return result;
       },
     }),
+  pluggyPreview: (cardId: string) =>
+    queryOptions({
+      queryKey: [...creditCardQueries.all, 'pluggy-preview', cardId],
+      queryFn: async () => {
+        const result = await send('credit-cards-preview-pluggy', { cardId });
+        if ('error' in result) {
+          throw new Error(result.error);
+        }
+        return result;
+      },
+    }),
   transactions: (cardId: string) =>
     queryOptions({
       queryKey: [...creditCardQueries.all, 'transactions', cardId],

@@ -5,9 +5,10 @@ import { Trans, useTranslation } from 'react-i18next';
 import { Button } from '@actual-app/components/button';
 import { InitialFocus } from '@actual-app/components/initial-focus';
 import { Input } from '@actual-app/components/input';
-import { Paragraph } from '@actual-app/components/paragraph';
 import { Select } from '@actual-app/components/select';
+import { styles } from '@actual-app/components/styles';
 import { Text } from '@actual-app/components/text';
+import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
 import { send } from '@actual-app/core/platform/client/connection';
 import { useQuery } from '@tanstack/react-query';
@@ -17,7 +18,7 @@ import { creditCardQueries, useCreateCreditCard } from '#credit-cards';
 import { useAccounts } from '#hooks/useAccounts';
 import { useFormat } from '#hooks/useFormat';
 
-import { Failure } from './ui';
+import { Failure, FieldLabel, Notice } from './ui';
 
 export function CreateCardModal() {
   const { t } = useTranslation();
@@ -123,20 +124,26 @@ export function CreateCardModal() {
   }
 
   return (
-    <Modal name="credit-card-create">
+    <Modal name="credit-card-create" containerProps={{ style: { width: 520 } }}>
       {({ state }) => (
         <>
           <ModalHeader
             title={t('Add card')}
             rightContent={<ModalCloseButton onPress={() => state.close()} />}
           />
-          <View style={{ gap: 12, padding: 4 }}>
-            <Paragraph>
+          <View style={{ gap: 14, padding: '0 4px 4px' }}>
+            <Text
+              style={{
+                ...styles.smallText,
+                color: theme.pageTextLight,
+                lineHeight: 1.5,
+              }}
+            >
               <Trans>
                 The card uses an account you already have. Charges stay ordinary
                 transactions, and this setup only stores the billing cycle.
               </Trans>
-            </Paragraph>
+            </Text>
             <Field label={<Trans>Account</Trans>}>
               <Select
                 options={available.map(
@@ -150,63 +157,89 @@ export function CreateCardModal() {
                 style={{ width: '100%' }}
               />
             </Field>
-            <Field label={<Trans>Name</Trans>}>
-              <Input value={name} onChangeValue={setName} />
-            </Field>
-            <Field label={<Trans>Institution</Trans>}>
-              <Input value={institution} onChangeValue={setInstitution} />
-            </Field>
-            <Field label={<Trans>Closing day</Trans>}>
-              <Input value={closingDay} onChangeValue={setClosingDay} />
-            </Field>
-            <Field label={<Trans>Due day</Trans>}>
-              <Input value={dueDay} onChangeValue={setDueDay} />
-            </Field>
-            <Field label={<Trans>Purchase on the closing day</Trans>}>
-              <Select
-                options={[
-                  ['next', t('Goes on the next bill')],
-                  ['current', t('Stays on this bill')],
-                ]}
-                value={policy}
-                onChange={setPolicy}
-                style={{ width: '100%' }}
-              />
-            </Field>
-            <Field label={<Trans>Credit limit</Trans>}>
-              <Input
-                value={limit}
-                placeholder={t('Optional')}
-                onChangeValue={value => {
-                  setLimit(value);
-                  setLimitEdited(true);
-                }}
-              />
-            </Field>
             {readingBank && (
-              <Text>
+              <Notice>
                 <Trans>Reading the card from the bank…</Trans>
-              </Text>
+              </Notice>
             )}
             {bankStatus === 'filled' && (
-              <Text>
+              <Notice>
                 <Trans>
                   Closing day, due day and limit were filled from the current
                   bill. A purchase on the closing day still follows the choice
-                  above.
+                  below.
                 </Trans>
-              </Text>
+              </Notice>
             )}
             {bankStatus === 'missing' && (
-              <Text>
+              <Notice tone="warning">
                 <Trans>
                   The bank did not return a cycle for this account. Enter the
                   days yourself.
                 </Trans>
-              </Text>
+              </Notice>
             )}
+            <FieldRow>
+              <Field label={<Trans>Name</Trans>}>
+                <Input value={name} onChangeValue={setName} />
+              </Field>
+              <Field label={<Trans>Institution</Trans>}>
+                <Input
+                  value={institution}
+                  placeholder={t('Optional')}
+                  onChangeValue={setInstitution}
+                />
+              </Field>
+            </FieldRow>
+            <FieldRow>
+              <Field label={<Trans>Closing day</Trans>}>
+                <Input
+                  value={closingDay}
+                  inputMode="numeric"
+                  onChangeValue={setClosingDay}
+                />
+              </Field>
+              <Field label={<Trans>Due day</Trans>}>
+                <Input
+                  value={dueDay}
+                  inputMode="numeric"
+                  onChangeValue={setDueDay}
+                />
+              </Field>
+            </FieldRow>
+            <FieldRow>
+              <Field label={<Trans>A purchase made on the closing day</Trans>}>
+                <Select
+                  options={[
+                    ['next', t('Goes on the next bill')],
+                    ['current', t('Stays on the bill that is closing')],
+                  ]}
+                  value={policy}
+                  onChange={setPolicy}
+                  style={{ width: '100%' }}
+                />
+              </Field>
+              <Field label={<Trans>Credit limit</Trans>}>
+                <Input
+                  value={limit}
+                  inputMode="decimal"
+                  placeholder={t('Optional')}
+                  onChangeValue={value => {
+                    setLimit(value);
+                    setLimitEdited(true);
+                  }}
+                  style={{ textAlign: 'right' }}
+                />
+              </Field>
+            </FieldRow>
             {createCard.error && <Failure message={createCard.error.message} />}
-            <View style={{ flexDirection: 'row', justifyContent: 'flex-end' }}>
+            <View
+              style={{
+                flexDirection: 'row',
+                justifyContent: 'flex-end',
+                marginTop: 6,
+              }}
+            >
               <Button style={{ marginRight: 10 }} onPress={() => state.close()}>
                 <Trans>Cancel</Trans>
               </Button>
@@ -268,10 +301,18 @@ export function CreateCardModal() {
   );
 }
 
+function FieldRow({ children }: { children: ReactNode }) {
+  return (
+    <View style={{ flexDirection: 'row', flexWrap: 'wrap', gap: 12 }}>
+      {children}
+    </View>
+  );
+}
+
 function Field({ label, children }: { label: ReactNode; children: ReactNode }) {
   return (
-    <View style={{ gap: 4 }}>
-      <Text>{label}</Text>
+    <View style={{ flex: '1 1 200px' }}>
+      <FieldLabel>{label}</FieldLabel>
       {children}
     </View>
   );

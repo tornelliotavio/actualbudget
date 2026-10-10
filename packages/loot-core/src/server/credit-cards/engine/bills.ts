@@ -53,8 +53,10 @@ export function computeBill(input: BillInput, today: string): BillView {
       .map(charge => charge.owedAmount),
   );
   const projectedTotal = computedTotal + projectedExtra;
+  // Until the bank confirms a total, the bill includes installments that
+  // have not been imported yet. A confirmed total stays the bank's number.
   const amountOwed =
-    input.confirmedTotal == null ? computedTotal : input.confirmedTotal;
+    input.confirmedTotal == null ? projectedTotal : input.confirmedTotal;
   const amountPaid = sum(input.payments.map(payment => payment.amount));
   const remaining = amountOwed - amountPaid;
   const divergence =

@@ -14,7 +14,11 @@ import {
   upcomingCycles,
 } from './engine';
 import type { Cycle, CycleConfig } from './engine';
-import { upsertImportRecord, upsertStoredBill } from './records';
+import {
+  listStoredBills,
+  upsertImportRecord,
+  upsertStoredBill,
+} from './records';
 import type { StoredBill } from './records';
 
 export type PluggyBillSnapshot = {
@@ -37,6 +41,29 @@ export type PluggyCreditSnapshot = {
 };
 
 type HandlerError = { error: string };
+
+export type PluggyBillPreview = {
+  id: string;
+  dueDate: string;
+  referenceMonth: string;
+  totalAmount: IntegerAmount | null;
+  minimumPayment: IntegerAmount | null;
+  alreadyStored: boolean;
+};
+
+export type PluggySyncPreview = {
+  bills: PluggyBillPreview[];
+  creditLimit: IntegerAmount | null;
+  availableLimit: IntegerAmount | null;
+};
+
+export function chosenBills<T extends { id: string }>(
+  bills: readonly T[],
+  billIds: readonly string[],
+): T[] {
+  const chosen = new Set(billIds);
+  return bills.filter(bill => chosen.has(bill.id));
+}
 
 export type AccountPreview = {
   linked: boolean;
@@ -268,28 +295,22 @@ export async function previewPluggyAccount({
   };
 }
 
-export async function syncPluggyCard(
-  cardId: string,
-): Promise<{ bills: number; limitsUpdated: boolean } | HandlerError> {
-  const card = await getCreditCardRow(cardId);
-  if (!card) {
-    return { error: 'not-found' };
-  }
-  if (card.provider !== 'pluggyai' || !card.providerAccountId) {
-    return { error: 'not-linked' };
-  }
+type LoadedPluggyCard = {
+  bills: PluggyBillSnapshot[];
+  credit: PluggyCreditSnapshot | null;
+};
 
-  const bills = await pluggyRequest<BillsResponse>(
-    '/bills',
-    card.providerAccountId,
-  );
+async function fetchPluggyCard(
+  providerAccountId: string,
+): Promise<LoadedPluggyCard | HandlerError> {
+  const bills = await pluggyRequest<BillsResponse>('/bills', providerAccountId);
   const billsError = requestError(bills);
   if (billsError) {
     return { error: billsError };
   }
   const account = await pluggyRequest<AccountResponse>(
     '/credit-card-account',
-    card.providerAccountId,
+    providerAccountId,
   );
   const accountError = requestError(account);
   if (accountError) {
@@ -297,9 +318,7 @@ export async function syncPluggyCard(
   }
   const billData = bills as BillsResponse;
   const accountData = account as AccountResponse;
-
-  return applyPluggyCardSnapshot({
-    cardId,
+  return {
     bills: (billData.bills ?? []).map(bill => ({
       id: bill.id,
       dueDate: bill.dueDate,
@@ -309,5 +328,72 @@ export async function syncPluggyCard(
       currency: bill.currency ?? null,
     })),
     credit: accountData.creditData ?? null,
+  };
+}
+
+async function linkedPluggyCard(
+  cardId: string,
+): Promise<{ providerAccountId: string } | HandlerError> {
+  const card = await getCreditCardRow(cardId);
+  if (!card) {
+    return { error: 'not-found' };
+  }
+  if (card.provider !== 'pluggyai' || !card.providerAccountId) {
+    return { error: 'not-linked' };
+  }
+  return { providerAccountId: card.providerAccountId };
+}
+
+export async function previewPluggyCard(
+  cardId: string,
+): Promise<PluggySyncPreview | HandlerError> {
+  const card = await linkedPluggyCard(cardId);
+  if ('error' in card) {
+    return card;
+  }
+  const loaded = await fetchPluggyCard(card.providerAccountId);
+  if ('error' in loaded) {
+    return loaded;
+  }
+  const stored = await listStoredBills(cardId);
+  const storedIds = new Set(
+    stored
+      .map(bill => bill.providerBillId)
+      .filter((id): id is string => id != null && id !== ''),
+  );
+  return {
+    bills: loaded.bills
+      .filter(bill => /^\d{4}-\d{2}-\d{2}$/.test(bill.dueDate))
+      .map(bill => ({
+        id: bill.id,
+        dueDate: bill.dueDate,
+        referenceMonth: bill.dueDate.slice(0, 7),
+        totalAmount: cents(bill.totalAmount),
+        minimumPayment: cents(bill.minimumPaymentAmount),
+        alreadyStored: storedIds.has(bill.id),
+      }))
+      .sort((a, b) => b.dueDate.localeCompare(a.dueDate)),
+    creditLimit: cents(loaded.credit?.creditLimit ?? null),
+    availableLimit: cents(loaded.credit?.availableCreditLimit ?? null),
+  };
+}
+
+export async function syncPluggyCard(
+  cardId: string,
+  selection: { billIds: readonly string[]; updateLimits: boolean },
+): Promise<{ bills: number; limitsUpdated: boolean } | HandlerError> {
+  const card = await linkedPluggyCard(cardId);
+  if ('error' in card) {
+    return card;
+  }
+  const loaded = await fetchPluggyCard(card.providerAccountId);
+  if ('error' in loaded) {
+    return loaded;
+  }
+
+  return applyPluggyCardSnapshot({
+    cardId,
+    bills: chosenBills(loaded.bills, selection.billIds),
+    credit: selection.updateLimits ? loaded.credit : null,
   });
 }

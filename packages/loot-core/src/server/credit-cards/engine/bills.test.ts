@@ -187,13 +187,15 @@ describe('bill figures', () => {
     expect(summary.availableLimit).toBe(310000);
     expect(summary.statement?.status).toBe('closed');
     expect(summary.openBill?.referenceMonth).toBe('2026-11');
+    expect(summary.openBill?.amountOwed).toBe(27590);
   });
 
-  it('keeps a projected installment off the computed total', () => {
+  it('keeps a projected installment off the computed total and on the amount owed', () => {
     const computed = view(november, today);
     expect(computed.computedTotal).toBe(0);
     expect(computed.projectedTotal).toBe(27590);
-    expect(computed.amountOwed).toBe(0);
+    expect(computed.amountOwed).toBe(27590);
+    expect(computed.remaining).toBe(27590);
     expect(computed.status).toBe('open');
   });
 
@@ -262,8 +264,7 @@ describe('bill figures', () => {
 
   it('allocates a payment to the chosen bill and spills the rest onto the next one', () => {
     const views = [october, november].map(item => view(item, '2026-11-12'));
-    // November has no confirmed total, so its remaining is 0. Use a closed
-    // confirmed bill for the spill target.
+    // Spill onto a confirmed November bill.
     const nextBill = view(
       bill({
         ...november,

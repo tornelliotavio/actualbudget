@@ -56,6 +56,15 @@ export function useCreatePurchase() {
   });
 }
 
+export function useDeletePurchase() {
+  const refresh = useRefreshCards();
+  return useMutation({
+    mutationFn: (id: string) =>
+      send('credit-cards-delete-purchase', { id }).then(unwrap),
+    onSuccess: refresh,
+  });
+}
+
 export function useConfirmBill() {
   const refresh = useRefreshCards();
   return useMutation({
@@ -74,6 +83,15 @@ export function useAllocatePayment() {
   });
 }
 
+export function useUnlinkPayment() {
+  const refresh = useRefreshCards();
+  return useMutation({
+    mutationFn: (id: string) =>
+      send('credit-cards-unlink-payment', { id }).then(unwrap),
+    onSuccess: refresh,
+  });
+}
+
 export function useReconcileCard() {
   const refresh = useRefreshCards();
   return useMutation({
@@ -86,8 +104,17 @@ export function useReconcileCard() {
 export function useSyncPluggyCard() {
   const refresh = useRefreshCards();
   return useMutation({
-    mutationFn: (cardId: string) =>
-      send('credit-cards-sync-pluggy', { cardId }).then(unwrap),
+    mutationFn: (input: Arg<'credit-cards-sync-pluggy'>) =>
+      send('credit-cards-sync-pluggy', input).then(unwrap),
+    onSuccess: refresh,
+  });
+}
+
+export function useDeleteBills() {
+  const refresh = useRefreshCards();
+  return useMutation({
+    mutationFn: (input: Arg<'credit-cards-delete-bills'>) =>
+      send('credit-cards-delete-bills', input).then(unwrap),
     onSuccess: refresh,
   });
 }

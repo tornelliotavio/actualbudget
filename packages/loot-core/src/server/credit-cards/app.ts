@@ -19,7 +19,11 @@ import {
 } from './engine';
 import type { ChargeKind, Cycle, CycleConfig } from './engine';
 import { getPluggyAiBills } from './pluggy-bills';
-import { previewPluggyAccount, syncPluggyCard } from './pluggy-sync';
+import {
+  previewPluggyAccount,
+  previewPluggyCard,
+  syncPluggyCard,
+} from './pluggy-sync';
 import { isProjectionError, projectCard } from './project';
 import type { CardProjection } from './project';
 import { reconcileCard } from './reconcile';
@@ -27,6 +31,7 @@ import {
   createPurchase,
   deletePayment,
   deletePurchase,
+  deleteStoredBills,
   findPurchase,
   getCardTransaction,
   insertReviewItem,
@@ -73,6 +78,8 @@ export type CreditCardsHandlers = {
   'credit-cards-transactions': typeof transactions;
   'credit-cards-assign-transactions': typeof assignTransactions;
   'credit-cards-sync-pluggy': typeof syncPluggy;
+  'credit-cards-preview-pluggy': typeof previewPluggy;
+  'credit-cards-delete-bills': typeof removeBills;
   'credit-cards-preview-account': typeof previewAccount;
   'credit-cards-reconcile': typeof reconcile;
   'pluggyai-bills': typeof getPluggyAiBills;
@@ -616,16 +623,56 @@ async function previewAccount({ accountId }: { accountId: string }) {
   return previewPluggyAccount({ accountId });
 }
 
+async function previewPluggy({ cardId }: { cardId: string }) {
+  return previewPluggyCard(cardId);
+}
+
 async function syncPluggy({
   cardId,
+  billIds,
+  updateLimits,
 }: {
   cardId: string;
+  billIds: string[];
+  updateLimits: boolean;
 }): Promise<{ bills: number; limitsUpdated: boolean } | HandlerError> {
   const blocked = await assertCreditCardsWritable();
   if (blocked) {
     return blocked;
   }
-  return syncPluggyCard(cardId);
+  if (!Array.isArray(billIds)) {
+    return { error: 'invalid-month' };
+  }
+  return syncPluggyCard(cardId, {
+    billIds,
+    updateLimits: updateLimits === true,
+  });
+}
+
+async function removeBills({
+  cardId,
+  referenceMonths,
+}: {
+  cardId: string;
+  referenceMonths: string[];
+}): Promise<{ removed: number } | HandlerError> {
+  const blocked = await assertCreditCardsWritable();
+  if (blocked) {
+    return blocked;
+  }
+  const card = await getCreditCardRow(cardId);
+  if (!card) {
+    return { error: 'not-found' };
+  }
+  if (
+    !Array.isArray(referenceMonths) ||
+    referenceMonths.length === 0 ||
+    referenceMonths.some(month => !/^\d{4}-\d{2}$/.test(month))
+  ) {
+    return { error: 'invalid-month' };
+  }
+  const removed = await deleteStoredBills(cardId, referenceMonths);
+  return { removed };
 }
 
 export const app = createApp<CreditCardsHandlers>();
@@ -656,6 +703,8 @@ app.method(
   mutator(undoable(assignTransactions)),
 );
 app.method('credit-cards-preview-account', previewAccount);
+app.method('credit-cards-preview-pluggy', previewPluggy);
 app.method('credit-cards-sync-pluggy', mutator(undoable(syncPluggy)));
+app.method('credit-cards-delete-bills', mutator(undoable(removeBills)));
 app.method('credit-cards-reconcile', mutator(undoable(reconcile)));
 app.method('pluggyai-bills', getPluggyAiBills);

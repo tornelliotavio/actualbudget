@@ -6,7 +6,11 @@ import { setSyncingMode } from '#server/sync';
 import { app } from './app';
 import { isCreditCardError } from './cards';
 import { billId } from './engine';
-import { applyPluggyCardSnapshot, dayFromBankDate } from './pluggy-sync';
+import {
+  applyPluggyCardSnapshot,
+  chosenBills,
+  dayFromBankDate,
+} from './pluggy-sync';
 
 async function emptyDatabase(): Promise<void> {
   const globals = globalThis as typeof globalThis & {
@@ -126,6 +130,65 @@ describe('pluggy card sync', () => {
 
     const after = await db.all('SELECT id FROM transactions');
     expect(after).toHaveLength(before.length + 1);
+  });
+
+  it('keeps only the bills that were chosen', () => {
+    const bills = [
+      { id: 'old', dueDate: '2025-10-10' },
+      { id: 'kept', dueDate: '2026-07-10' },
+    ];
+    expect(chosenBills(bills, ['kept']).map(bill => bill.id)).toEqual(['kept']);
+    expect(chosenBills(bills, [])).toEqual([]);
+  });
+
+  it('removes a stored bill and leaves the account transactions', async () => {
+    const accountId = await db.insertAccount({
+      name: 'Inter Card',
+      offbudget: 0,
+    });
+    const created = await app.handlers['credit-cards-create']({
+      accountId,
+      name: 'Inter',
+      provider: 'pluggyai',
+      providerAccountId: 'pluggy-account',
+      closingDay: 10,
+      dueDay: 17,
+      closingDayPolicy: 'current',
+    });
+    if (isCreditCardError(created)) {
+      throw new Error(created.error);
+    }
+    await applyPluggyCardSnapshot({
+      cardId: created.id,
+      ...snapshot,
+    });
+    const transactionId = await db.insertTransaction({
+      account: accountId,
+      date: '2017-01-05',
+      amount: -10000,
+      notes: 'Store',
+    });
+
+    const removed = await app.handlers['credit-cards-delete-bills']({
+      cardId: created.id,
+      referenceMonths: ['2017-01'],
+    });
+    expect(removed).toEqual({ removed: 1 });
+
+    const bills = await db.all(
+      'SELECT id FROM credit_card_bills WHERE tombstone = 0',
+    );
+    expect(bills).toEqual([]);
+    const detail = await app.handlers['credit-cards-bill']({
+      cardId: created.id,
+      billId: billId(created.id, '2017-01'),
+      today: '2020-06-01',
+    });
+    expect(detail).toEqual({ error: 'not-found' });
+    const transactions = await db.all<{ id: string }>(
+      'SELECT id FROM transactions WHERE tombstone = 0',
+    );
+    expect(transactions.map(row => row.id)).toContain(transactionId);
   });
 
   it('reads the day from a bank date and ignores anything else', () => {

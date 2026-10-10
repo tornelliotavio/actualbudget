@@ -1,7 +1,12 @@
 import * as db from '#server/db';
 import { fromDateRepr } from '#server/models';
 
-import { addCalendarMonths, installmentId, splitInstallments } from './engine';
+import {
+  addCalendarMonths,
+  billId,
+  installmentId,
+  splitInstallments,
+} from './engine';
 import type { ChargeKind, InstallmentStatus } from './engine';
 
 export type StoredBill = {
@@ -111,6 +116,42 @@ function toBill(row: BillRow): StoredBill {
     lastConfirmedAt: row.last_confirmed_at,
     cancelled: row.cancelled === 1,
   };
+}
+
+export async function deleteStoredBills(
+  cardId: string,
+  referenceMonths: readonly string[],
+): Promise<number> {
+  const months = [
+    ...new Set(referenceMonths.filter(month => /^\d{4}-\d{2}$/.test(month))),
+  ];
+  const payments = await listPayments(cardId);
+  let removed = 0;
+  for (const month of months) {
+    const id = billId(cardId, month);
+    const existing = await db.first<{ id: string }>(
+      'SELECT id FROM credit_card_bills WHERE id = ? AND card_id = ? AND tombstone = 0',
+      [id, cardId],
+    );
+    if (!existing) {
+      continue;
+    }
+    await db.delete_('credit_card_bills', id);
+    for (const payment of payments) {
+      if (payment.billId === id) {
+        await deletePayment(payment.id);
+      }
+    }
+    const imports = await db.all<{ id: string }>(
+      'SELECT id FROM credit_card_import_records WHERE local_entity_id = ? AND tombstone = 0',
+      [id],
+    );
+    for (const record of imports) {
+      await db.delete_('credit_card_import_records', record.id);
+    }
+    removed += 1;
+  }
+  return removed;
 }
 
 export async function listStoredBills(cardId: string): Promise<StoredBill[]> {

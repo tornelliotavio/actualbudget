@@ -171,4 +171,84 @@ describe('credit card reconciliation', () => {
     );
     expect(unlinked).toHaveLength(0);
   });
+
+  it('puts the remaining installments on the next bills when the bank omits the purchase total', async () => {
+    const accountId = await db.insertAccount({
+      name: 'Inter Card',
+      offbudget: 0,
+    });
+    const created = await app.handlers['credit-cards-create']({
+      accountId,
+      name: 'Inter',
+      closingDay: 4,
+      dueDay: 10,
+      closingDayPolicy: 'next',
+    });
+    if (isCreditCardError(created)) {
+      throw new Error(created.error);
+    }
+
+    const metadata = {
+      'creditCardMetadata.totalInstallments': 6,
+    };
+    const second = await charge(accountId, '2026-08-11', -19500, {
+      ...metadata,
+      'creditCardMetadata.installmentNumber': 2,
+    });
+    const third = await charge(accountId, '2026-09-11', -19500, {
+      ...metadata,
+      'creditCardMetadata.installmentNumber': 3,
+    });
+    await db.update('transactions', { id: second, notes: 'PNEUCENTERCENTRO' });
+    await db.update('transactions', { id: third, notes: 'PNEUCENTERCENTRO' });
+    await charge(accountId, '2026-10-04', -4590, null);
+    await charge(accountId, '2026-10-06', -3500, null);
+
+    const before = await db.all(
+      'SELECT id FROM credit_card_purchases WHERE tombstone = 0',
+    );
+    expect(before).toHaveLength(0);
+
+    const open = await app.handlers['credit-cards-bills']({
+      cardId: created.id,
+      today: '2026-10-10',
+    });
+    if ('error' in open) {
+      throw new Error(open.error);
+    }
+    const owed = Object.fromEntries(
+      open.map(bill => [bill.referenceMonth, bill.amountOwed]),
+    );
+    expect(owed['2026-08']).toBeUndefined();
+    expect(owed['2026-09']).toBe(19500);
+    expect(owed['2026-10']).toBe(19500);
+    expect(owed['2026-11']).toBe(27590);
+    expect(owed['2026-12']).toBe(19500);
+    expect(owed['2027-01']).toBe(19500);
+
+    const reconciled = await app.handlers['credit-cards-reconcile']({
+      cardId: created.id,
+      today: '2026-10-10',
+    });
+    expect(reconciled).toMatchObject({
+      purchases: 1,
+      installmentsLinked: 2,
+      reviews: 0,
+    });
+    const again = await app.handlers['credit-cards-bills']({
+      cardId: created.id,
+      today: '2026-10-10',
+    });
+    if ('error' in again) {
+      throw new Error(again.error);
+    }
+    const owedAgain = Object.fromEntries(
+      again.map(bill => [bill.referenceMonth, bill.amountOwed]),
+    );
+    expect(owedAgain).toEqual(owed);
+    const stored = await db.all(
+      'SELECT id FROM credit_card_purchases WHERE tombstone = 0',
+    );
+    expect(stored).toHaveLength(1);
+  });
 });
