@@ -175,7 +175,12 @@ const lootCoreBackend = (): Plugin => ({
         'development',
         '--watch',
       ],
-      { cwd: lootCoreRoot, stdio: 'inherit' },
+      // yarn is a .cmd shim on Windows, which Node can only spawn via a shell.
+      {
+        cwd: lootCoreRoot,
+        stdio: 'inherit',
+        shell: process.platform === 'win32',
+      },
     );
     child.on('error', err => {
       server.config.logger.error(
