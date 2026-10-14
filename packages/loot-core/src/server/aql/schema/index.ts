@@ -54,6 +54,20 @@ export const schema = {
     tombstone: f('boolean'),
     schedule: f('id', { ref: 'schedules' }),
     raw_synced_data: f('string'),
+    // Bill rows exist only for bills with stated facts, so this is not a ref:
+    // a ref to a missing row reads back as null.
+    card_bill: f('string'),
+    card_bill_source: f('string'),
+    card_kind: f('string'),
+    card_purchase: f('string'),
+    installment_number: f('integer'),
+    installment_count: f('integer'),
+    projected: f('boolean', { default: false }),
+    // The date the budget counts the transaction on. A credit card
+    // transaction counts on its bill's due date; the view falls back to
+    // `date` for everything else.
+    budget_date: f('date'),
+    bank_sync_missing_since: f('date'),
     // subtransactions is a special field added if the table has the
     // `splits: grouped` option
   },
@@ -79,6 +93,57 @@ export const schema = {
     last_sync: f('string'),
     bank_sync_status: f('string'),
     account_group_id: f('id', { ref: 'account_groups' }),
+    kind: f('string', { default: 'standard' }),
+    balance_current: f('integer'),
+    balance_available: f('integer'),
+    balance_limit: f('integer'),
+  },
+  card_profiles: {
+    // Same id as the credit card account it describes.
+    id: f('id'),
+    closing_rule: f('string'),
+    closing_day_provider: f('integer'),
+    closing_day_user: f('integer'),
+    closing_offset_user: f('integer'),
+    due_day_provider: f('integer'),
+    due_day_user: f('integer'),
+    closing_day_in_next_bill: f('boolean'),
+    credit_limit_user: f('integer'),
+    parent_account: f('id', { ref: 'accounts' }),
+    connector: f('string'),
+    brand: f('string'),
+    holder_type: f('string'),
+    card_status: f('string'),
+    payment_patterns: f('string'),
+    tombstone: f('boolean'),
+  },
+  card_bills: {
+    id: f('id'),
+    account: f('id', { ref: 'accounts', required: true }),
+    reference_month: f('string', { required: true }),
+    closing_date_provider: f('date'),
+    due_date_provider: f('date'),
+    closing_date_user: f('date'),
+    due_date_user: f('date'),
+    provider_bill_id: f('string'),
+    provider_total: f('integer'),
+    provider_minimum: f('integer'),
+    provider_finance_charges: f('integer'),
+    provider_payments: f('json'),
+    total_user: f('integer'),
+    tombstone: f('boolean'),
+  },
+  card_purchases: {
+    id: f('id'),
+    account: f('id', { ref: 'accounts', required: true }),
+    stem: f('string'),
+    installment_count: f('integer'),
+    anchor_month: f('string'),
+    card_last4: f('string'),
+    purchase_date: f('date'),
+    total_amount: f('integer'),
+    status: f('string', { default: 'active' }),
+    tombstone: f('boolean'),
   },
   account_groups: {
     id: f('id'),
@@ -389,6 +454,8 @@ export const schemaConfig: SchemaConfig = {
           category: `CASE WHEN _.isParent = 1 THEN NULL ELSE cm.transferId END`,
           amount: `IFNULL(_.amount, 0)`,
           parent_id: 'CASE WHEN _.isChild = 0 THEN NULL ELSE _.parent_id END',
+          budget_date: 'IFNULL(_.budget_date, _.date)',
+          projected: 'IFNULL(_.projected, 0)',
         });
 
         return `

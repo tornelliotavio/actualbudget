@@ -2,6 +2,12 @@ import type { IntegerAmount } from '#shared/util';
 
 import type { AccountEntity } from './account';
 import type { CategoryEntity } from './category';
+import type {
+  CardBillEntity,
+  CardBillSource,
+  CardEntryKind,
+  CardPurchaseEntity,
+} from './credit-card';
 import type { PayeeEntity } from './payee';
 import type { ScheduleEntity } from './schedule';
 
@@ -35,5 +41,14 @@ export type TransactionEntity = {
     difference: number;
   } | null;
   raw_synced_data?: string | undefined;
+  card_bill?: CardBillEntity['id'] | null;
+  card_bill_source?: CardBillSource | null;
+  card_kind?: CardEntryKind | null;
+  card_purchase?: CardPurchaseEntity['id'] | null;
+  installment_number?: number | null;
+  installment_count?: number | null;
+  projected?: boolean;
+  budget_date?: string | null;
+  bank_sync_missing_since?: string | null;
   _ruleErrors?: string[];
 };

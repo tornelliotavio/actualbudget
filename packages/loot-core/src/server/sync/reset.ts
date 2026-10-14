@@ -59,6 +59,11 @@ export async function resetSync(
       DELETE FROM category_groups WHERE tombstone = 1;
       DELETE FROM schedules WHERE tombstone = 1;
       DELETE FROM rules WHERE tombstone = 1;
+      DELETE FROM account_groups WHERE tombstone = 1;
+      DELETE FROM card_profiles WHERE tombstone = 1;
+      DELETE FROM card_bills WHERE tombstone = 1;
+      DELETE FROM card_purchases WHERE tombstone = 1;
+      DELETE FROM bank_sync_suppressions WHERE tombstone = 1;
       ANALYZE;
       VACUUM;
     `);

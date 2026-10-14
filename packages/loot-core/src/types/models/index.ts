@@ -5,6 +5,7 @@ export type * from './bank';
 export type * from './bank-sync';
 export type * from './category';
 export type * from './category-group';
+export type * from './credit-card';
 export type * from './dashboard';
 export type * from './enablebanking';
 export type * from './forecast';
