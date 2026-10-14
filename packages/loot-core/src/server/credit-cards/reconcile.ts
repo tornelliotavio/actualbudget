@@ -189,7 +189,17 @@ export async function reconcileCardAccount(
       if (!current) {
         continue;
       }
-      const changes = changedFields(current, entryColumns(accountId, entry));
+      const desired: Partial<ReturnType<typeof entryColumns>> = entryColumns(
+        accountId,
+        entry,
+      );
+      // The first reconciliation moves a transaction to the bank's date;
+      // after that a date the user set stays, except on installments, whose
+      // dates follow their bills.
+      if (current.card_bill && entry.kind !== 'installment') {
+        delete desired.date;
+      }
+      const changes = changedFields(current, desired);
       if (Object.keys(changes).length > 0) {
         await db.updateTransaction({ id: entry.id, ...changes });
       }

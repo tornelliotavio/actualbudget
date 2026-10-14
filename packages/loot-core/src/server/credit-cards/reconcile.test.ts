@@ -2,6 +2,8 @@ import { app as accountsApp } from '#server/accounts/app';
 import * as db from '#server/db';
 import { loadMappings } from '#server/db/mappings';
 import { runMutator } from '#server/mutators';
+import { app as transactionsApp } from '#server/transactions/app';
+import type { TransactionEntity } from '#types/models';
 
 import { app } from './app';
 import { getCardBills } from './bills';
@@ -331,5 +333,28 @@ describe('reconcileCardAccount', () => {
          WHERE card_bill_source = 'adjustment' AND tombstone = 0`,
       ),
     ).toEqual([]);
+  });
+
+  it('reconciles a card when the user edits its transactions', async () => {
+    const accountId = await createCard();
+    await transactionsApp.handlers['transaction-add']({
+      id: 'manual',
+      account: accountId,
+      date: '2026-10-10',
+      amount: -5000,
+    } as TransactionEntity);
+    const [added] = await cardRows(accountId);
+    expect(added.card_bill).toBe(`${accountId}:2026-11`);
+
+    await transactionsApp.handlers['transaction-update']({
+      id: 'manual',
+      date: '2026-11-07',
+    } as TransactionEntity);
+    const [moved] = await cardRows(accountId);
+    expect(moved).toMatchObject({
+      date: 20261107,
+      card_bill: `${accountId}:2026-12`,
+      budget_date: 20261212,
+    });
   });
 });

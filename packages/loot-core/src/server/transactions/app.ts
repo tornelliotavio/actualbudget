@@ -1,5 +1,6 @@
 import { createApp } from '#server/app';
 import { aqlQuery } from '#server/aql';
+import { reconcileCardsTouchedBy } from '#server/credit-cards/edits';
 import * as db from '#server/db';
 import { mutator } from '#server/mutators';
 import { undoable } from '#server/undo';
@@ -47,6 +48,13 @@ async function handleBatchUpdateTransactions({
     learnCategories,
     runTransfers,
   });
+  await reconcileCardsTouchedBy(
+    [
+      ...result.added.map(transaction => transaction.id),
+      ...(updated ?? []).map(transaction => transaction.id),
+      ...(deleted ?? []).map(transaction => transaction.id),
+    ].filter((id): id is string => id != null),
+  );
 
   return result;
 }
