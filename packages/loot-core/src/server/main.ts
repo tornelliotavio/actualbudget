@@ -16,7 +16,6 @@ import { aqlQuery } from './aql';
 import { app as authApp } from './auth/app';
 import { app as budgetApp } from './budget/app';
 import { app as budgetFilesApp } from './budgetfiles/app';
-import { app as creditCardBillsApp } from './credit-card-bills/app';
 import { app as creditCardsApp } from './credit-cards/app';
 import { app as dashboardApp } from './dashboard/app';
 import * as db from './db';
@@ -154,7 +153,6 @@ app.combine(
   budgetFilesApp,
   encryptionApp,
   tagsApp,
-  creditCardBillsApp,
   creditCardsApp,
 );
 
