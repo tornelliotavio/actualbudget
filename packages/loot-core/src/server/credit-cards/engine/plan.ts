@@ -118,8 +118,12 @@ function resolveOwnBill(
   entry: CardEntry,
   kind: CardEntryKind,
 ): { bill: MonthString; source: BillSource } {
-  if (entry.stored.billSource === 'user' && entry.stored.bill) {
-    return { bill: entry.stored.bill, source: 'user' };
+  const storedSource = entry.stored.billSource;
+  if (
+    (storedSource === 'user' || storedSource === 'adjustment') &&
+    entry.stored.bill
+  ) {
+    return { bill: entry.stored.bill, source: storedSource };
   }
   if (kind === 'payment') {
     // A payment pays the bill that closed most recently before it.
@@ -184,7 +188,10 @@ export function planCardAccount(input: PlanInput): CardPlan {
   const storedProjected = input.entries.filter(entry => entry.projected);
 
   const resolved: Resolved[] = real.map(entry => {
-    const kind = classifyEntry(entry, input.classify);
+    const kind =
+      entry.stored.billSource === 'adjustment'
+        ? 'fee'
+        : classifyEntry(entry, input.classify);
     const own = resolveOwnBill(input, entry, kind);
     return {
       entry,

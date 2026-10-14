@@ -115,6 +115,7 @@ export const schema = {
     holder_type: f('string'),
     card_status: f('string'),
     payment_patterns: f('string'),
+    adjustments_from: f('date'),
     tombstone: f('boolean'),
   },
   card_bills: {

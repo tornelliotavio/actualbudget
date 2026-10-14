@@ -8,6 +8,7 @@ import type {
   TransactionEntity,
 } from '#types/models';
 
+import { reconcileBillAdjustments } from './adjustments';
 import { calendarFor, classifyOptions, toCardEntry } from './card-entries';
 import { billRowId } from './engine/ids';
 import type { EntryPlan, PlanSuggestion, ProjectedPlan } from './engine/plan';
@@ -219,6 +220,8 @@ export async function reconcileCardAccount(
       await suppressImport(accountId, id, 'projected-deleted');
     }
   });
+
+  await reconcileBillAdjustments(accountId, today);
 
   if (plan.suggestions.length > 0) {
     logger.log('Credit card suggestions', accountId, plan.suggestions);

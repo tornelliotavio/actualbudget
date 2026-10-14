@@ -11,7 +11,12 @@ export type CardEntryKind =
   | 'credit'
   | 'payment';
 
-export type CardBillSource = 'user' | 'provider' | 'installment' | 'cycle';
+export type CardBillSource =
+  | 'user'
+  | 'provider'
+  | 'installment'
+  | 'cycle'
+  | 'adjustment';
 
 /** Settings of a credit card account; `id` is the account id. */
 export type CardProfileEntity = {
@@ -31,6 +36,11 @@ export type CardProfileEntity = {
   holder_type: string | null;
   card_status: string | null;
   payment_patterns: string | null;
+  /**
+   * Bills closing before this day are left without finance-charge
+   * adjustments: the balance the account started with already covers them.
+   */
+  adjustments_from: string | null;
   tombstone?: boolean;
 };
 

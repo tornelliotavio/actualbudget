@@ -54,7 +54,13 @@ export type CardEntryKind =
   | 'credit'
   | 'payment';
 
-export type BillSource = 'user' | 'provider' | 'installment' | 'cycle';
+export type BillSource =
+  | 'user'
+  | 'provider'
+  | 'installment'
+  | 'cycle'
+  /** A charge the reconciliation created to match the bank's bill total. */
+  | 'adjustment';
 
 /** What the bank said about a card transaction, normalized. */
 export type ProviderFacts = {

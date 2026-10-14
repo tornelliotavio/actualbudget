@@ -32,6 +32,7 @@ CREATE TABLE card_profiles
    holder_type TEXT,
    card_status TEXT,
    payment_patterns TEXT,
+   adjustments_from INTEGER,
    tombstone INTEGER DEFAULT 0);
 
 CREATE TABLE card_bills

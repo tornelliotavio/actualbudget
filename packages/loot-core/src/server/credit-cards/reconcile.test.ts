@@ -258,4 +258,78 @@ describe('reconcileCardAccount', () => {
     );
     expect(result.status).toBe('needs-schedule');
   });
+
+  it('charges finance charges the bank only listed on the bill', async () => {
+    const accountId = await createCard();
+    await addTransaction({
+      id: 'purchase',
+      account: accountId,
+      date: '2026-09-20',
+      amount: -100000,
+      notes: 'MERCADO',
+    });
+    await runMutator(() =>
+      db.insertWithSchema('card_bills', {
+        id: `${accountId}:2026-10`,
+        account: accountId,
+        reference_month: '2026-10',
+        provider_total: 102350,
+        provider_finance_charges: 2350,
+      }),
+    );
+    const adjustments = () =>
+      db.all<{ amount: number; card_bill: string; tombstone: number }>(
+        `SELECT amount, card_bill, tombstone FROM transactions
+         WHERE acct = ? AND card_bill_source = 'adjustment'`,
+        [accountId],
+      );
+
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+    expect(await adjustments()).toEqual([
+      { amount: -2350, card_bill: `${accountId}:2026-10`, tombstone: 0 },
+    ]);
+    const [bill] = (await getCardBills(accountId, { today: TODAY })).bills;
+    expect(bill).toMatchObject({ referenceMonth: '2026-10', divergence: 0 });
+
+    await addTransaction({
+      id: 'iof',
+      account: accountId,
+      date: '2026-10-03',
+      amount: -2350,
+      notes: 'IOF',
+    });
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+    expect(await adjustments()).toEqual([]);
+  });
+
+  it('does not recreate a finance charge adjustment the user deleted', async () => {
+    const accountId = await createCard();
+    await addTransaction({
+      account: accountId,
+      date: '2026-09-20',
+      amount: -100000,
+      notes: 'MERCADO',
+    });
+    await runMutator(() =>
+      db.insertWithSchema('card_bills', {
+        id: `${accountId}:2026-10`,
+        account: accountId,
+        reference_month: '2026-10',
+        provider_total: 102350,
+        provider_finance_charges: 2350,
+      }),
+    );
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+    const row = await db.first<{ id: string }>(
+      "SELECT id FROM transactions WHERE card_bill_source = 'adjustment'",
+    );
+    await runMutator(() => db.deleteTransaction({ id: row!.id }));
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+    expect(
+      await db.all(
+        `SELECT id FROM transactions
+         WHERE card_bill_source = 'adjustment' AND tombstone = 0`,
+      ),
+    ).toEqual([]);
+  });
 });

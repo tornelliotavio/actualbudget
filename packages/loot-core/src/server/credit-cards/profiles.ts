@@ -1,4 +1,5 @@
 import * as db from '#server/db';
+import { currentDay } from '#shared/months';
 import type { AccountEntity, CardProfileEntity } from '#types/models';
 
 export type CardSettingsInput = {
@@ -73,6 +74,7 @@ export async function makeCreditCardAccount(
     ...userFields,
     closing_day_provider: legacy?.closing_day ?? null,
     due_day_provider: legacy?.due_day ?? null,
+    adjustments_from: currentDay(),
   });
 }
 
