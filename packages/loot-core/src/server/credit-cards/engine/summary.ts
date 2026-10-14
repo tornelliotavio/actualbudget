@@ -24,6 +24,8 @@ export type SummaryEntry = {
   kind: CardEntryKind;
   bill: MonthString;
   projected: boolean;
+  /** The user put this transaction on `bill`. */
+  pinned?: boolean;
 };
 
 export type BillFacts = {
@@ -88,7 +90,11 @@ export function summarizeBills(
 
   for (const entry of entries) {
     if (entry.kind === 'payment') {
-      const cycle = calendar.monthForDate(entry.date);
+      // A payment counts toward the bill that closed before its cycle, or
+      // the bill the user put it on.
+      const cycle = entry.pinned
+        ? addMonths(entry.bill, 1)
+        : calendar.monthForDate(entry.date);
       paymentsInCycle.set(
         cycle,
         (paymentsInCycle.get(cycle) ?? 0) + entry.amount,

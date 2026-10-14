@@ -229,4 +229,20 @@ describe('summarizeBills', () => {
     );
     expect(december.previousBalance).toBe(25000);
   });
+
+  it('counts a payment toward the bill the user put it on', () => {
+    const [november, december] = summarizeBills(
+      calendar,
+      [
+        charge('2026-10-20', 1000, '2026-11'),
+        charge('2026-11-20', 2000, '2026-12'),
+        { ...payment('2026-11-11', 2000), bill: '2026-12', pinned: true },
+      ],
+      [],
+      ['2026-11', '2026-12'],
+      '2026-12-07',
+    );
+    expect(november).toMatchObject({ paid: 0, status: 'overdue' });
+    expect(december).toMatchObject({ paid: 2000 });
+  });
 });

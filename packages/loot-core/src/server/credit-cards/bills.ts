@@ -62,6 +62,7 @@ export function summarizeCardState(
         kind: entry.stored.kind ?? classifyEntry(entry, options),
         bill: entry.stored.bill ?? calendar.monthForDate(entry.date),
         projected: entry.projected,
+        pinned: entry.stored.billSource === 'user',
       };
     });
 
