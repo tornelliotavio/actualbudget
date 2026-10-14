@@ -1957,6 +1957,11 @@ const Transaction = memo(function Transaction({
             key={columnId}
             note={notes ?? ''}
             scheduleNote={isPreview ? schedule?.name : null}
+            installment={
+              transaction.installment_number && transaction.installment_count
+                ? `${transaction.installment_number}/${transaction.installment_count}`
+                : null
+            }
             focused={focusedField === 'notes'}
             valueStyle={valueStyle}
             onClickTag={onNotesTagClick}
@@ -2336,7 +2341,7 @@ const Transaction = memo(function Transaction({
             ? { color: theme.tableRowBackgroundHighlightText }
             : { color: theme.tableText }),
           ...style,
-          ...(isPreview && {
+          ...((isPreview || transaction.projected) && {
             color: theme.tableTextInactive,
             fontStyle: 'italic',
           }),
@@ -2442,6 +2447,8 @@ type NotesCellProps = {
   width: ResolvedTransactionTableColumnWidth;
   note: string;
   scheduleNote: string | null | undefined;
+  /** Installment of a card purchase, such as "3/6". */
+  installment?: string | null;
   focused: boolean;
   valueStyle: CSSProperties | null;
   onUpdate: (value: string) => void;
@@ -2453,6 +2460,7 @@ function NotesCell({
   width,
   note,
   scheduleNote,
+  installment,
   focused,
   valueStyle,
   onUpdate,
@@ -2500,7 +2508,14 @@ function NotesCell({
       value={displayedNote}
       valueStyle={valueStyle}
       formatter={value =>
-        NotesTagFormatter({ notes: value, onNotesTagClick: onClickTag })
+        installment ? (
+          <>
+            <InstallmentBadge label={installment} />
+            {NotesTagFormatter({ notes: value, onNotesTagClick: onClickTag })}
+          </>
+        ) : (
+          NotesTagFormatter({ notes: value, onNotesTagClick: onClickTag })
+        )
       }
       focused={focused}
       exposed={focused}
@@ -2539,6 +2554,25 @@ function NotesCell({
         />
       )}
     </CustomCell>
+  );
+}
+
+function InstallmentBadge({ label }: { label: string }) {
+  return (
+    <Text
+      style={{
+        ...styles.tnum,
+        fontSize: '0.85em',
+        fontStyle: 'normal',
+        borderRadius: 4,
+        padding: '0 4px',
+        marginRight: 5,
+        color: theme.pillText,
+        backgroundColor: theme.pillBackground,
+      }}
+    >
+      {label}
+    </Text>
   );
 }
 
