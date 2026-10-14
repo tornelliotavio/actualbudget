@@ -132,6 +132,9 @@ async function writeProjected(
       imported_payee: template?.imported_payee ?? null,
       cleared: false,
       projected: true,
+      // The id is deterministic and may belong to a projection removed
+      // earlier, such as one of a purchase that was cancelled and resumed.
+      tombstone: false,
       ...columns,
     });
   }
@@ -223,6 +226,9 @@ export async function reconcileCardAccount(
     }
 
     for (const id of plan.removeProjected) {
+      // Only projections the user deleted stay marked as projected once
+      // deleted; those are never created again.
+      await db.updateTransaction({ id, projected: false });
       await db.deleteTransaction({ id });
     }
 

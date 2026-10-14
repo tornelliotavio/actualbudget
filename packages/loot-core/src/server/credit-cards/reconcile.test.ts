@@ -384,4 +384,40 @@ describe('reconcileCardAccount', () => {
       available: 204000,
     });
   });
+
+  it('stops and resumes the projections of a purchase', async () => {
+    const accountId = await createCard();
+    await addTransaction({
+      id: 'first',
+      account: accountId,
+      date: '2026-10-10',
+      amount: -10000,
+      notes: 'LOJA X',
+      imported_id: 'pluggy-1',
+      raw_synced_data: pluggyRaw({
+        description: 'LOJA X',
+        'creditCardMetadata.installmentNumber': 1,
+        'creditCardMetadata.totalInstallments': 3,
+      }),
+    });
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+    const projected = async () =>
+      (await cardRows(accountId)).filter(
+        row => row.projected === 1 && row.tombstone === 0,
+      ).length;
+    expect(await projected()).toBe(2);
+
+    const [{ card_purchase: purchaseId }] = await cardRows(accountId);
+    await app.handlers['credit-card-purchase-status']({
+      id: purchaseId!,
+      status: 'cancelled',
+    });
+    expect(await projected()).toBe(0);
+
+    await app.handlers['credit-card-purchase-status']({
+      id: purchaseId!,
+      status: 'active',
+    });
+    expect(await projected()).toBe(2);
+  });
 });
