@@ -72,6 +72,13 @@ export async function getCardBills(
     })),
     [...months],
     today,
+    entries
+      .filter(entry => !entry.projected)
+      .reduce<string | null>(
+        (earliest, entry) =>
+          earliest == null || entry.date < earliest ? entry.date : earliest,
+        null,
+      ),
   );
 
   const providerIds = new Map(

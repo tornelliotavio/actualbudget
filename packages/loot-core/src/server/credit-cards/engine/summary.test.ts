@@ -144,4 +144,89 @@ describe('summarizeBills', () => {
     expect(december.previousBalance).toBe(0);
     expect(december.total).toBe(90000);
   });
+
+  it('settles a bill whose shortfall a later refund covers', () => {
+    const [november, december] = summarizeBills(
+      calendar,
+      [
+        charge('2026-10-20', 91282, '2026-11'),
+        payment('2026-11-11', 90824),
+        { ...charge('2026-11-08', -458, '2026-12'), kind: 'credit' as const },
+      ],
+      [],
+      ['2026-11', '2026-12'],
+      '2026-12-20',
+    );
+    expect(november).toMatchObject({
+      remaining: 0,
+      status: 'paid',
+      carriedOver: false,
+    });
+    expect(december.total).toBe(0);
+  });
+
+  it('carries no debt from a cycle the history starts in the middle of', () => {
+    const [november, december] = summarizeBills(
+      calendar,
+      [
+        charge('2026-10-20', 125000, '2026-11'),
+        payment('2026-11-11', 50000),
+        charge('2026-11-20', 90000, '2026-12'),
+      ],
+      [],
+      ['2026-11', '2026-12'],
+      '2026-12-07',
+      '2026-10-20',
+    );
+    expect(november).toMatchObject({
+      complete: false,
+      status: 'paid',
+      remaining: 0,
+    });
+    expect(december).toMatchObject({
+      complete: true,
+      previousBalance: 0,
+      total: 90000,
+    });
+  });
+
+  it('carries an advance payment from a cycle missing its start', () => {
+    const [, december] = summarizeBills(
+      calendar,
+      [
+        charge('2026-10-20', 151454, '2026-11'),
+        payment('2026-11-11', 151454),
+        payment('2026-12-03', 10000),
+        charge('2026-11-20', 182118, '2026-12'),
+      ],
+      [],
+      ['2026-11', '2026-12'],
+      '2026-12-07',
+      '2026-10-20',
+    );
+    expect(december).toMatchObject({ previousBalance: -10000, total: 172118 });
+  });
+
+  it('carries from an incomplete cycle the bank reported', () => {
+    const [, december] = summarizeBills(
+      calendar,
+      [
+        charge('2026-10-20', 1000, '2026-11'),
+        payment('2026-11-11', 100000),
+        charge('2026-11-20', 90000, '2026-12'),
+      ],
+      [
+        {
+          referenceMonth: '2026-11',
+          providerTotal: 125000,
+          userTotal: null,
+          minimumPayment: null,
+        },
+      ],
+      ['2026-11', '2026-12'],
+      '2026-12-07',
+      '2026-10-20',
+    );
+    expect(december.previousBalance).toBe(25000);
+  });
 });

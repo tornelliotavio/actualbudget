@@ -54,6 +54,8 @@ export type BillSummary = BillPeriod & {
   remaining: Cents;
   /** The next bill closed before this one was paid in full. */
   carriedOver: boolean;
+  /** Transactions cover the whole cycle; history may start mid-cycle. */
+  complete: boolean;
 };
 
 /**
@@ -67,6 +69,8 @@ export function summarizeBills(
   facts: BillFacts[],
   months: MonthString[],
   today: DateString,
+  /** Date of the first transaction known; earlier cycles are incomplete. */
+  historyStart: DateString | null = null,
 ): BillSummary[] {
   if (months.length === 0) {
     return [];
@@ -77,6 +81,7 @@ export function summarizeBills(
   const factsByMonth = new Map(facts.map(fact => [fact.referenceMonth, fact]));
 
   const charges = new Map<MonthString, Cents>();
+  const credits = new Map<MonthString, Cents>();
   const projectedCharges = new Map<MonthString, Cents>();
   const paymentsInCycle = new Map<MonthString, Cents>();
   const paymentsSoFar = new Map<MonthString, Cents>();
@@ -98,6 +103,9 @@ export function summarizeBills(
     }
     const owed = -entry.amount;
     charges.set(entry.bill, (charges.get(entry.bill) ?? 0) + owed);
+    if (entry.kind === 'credit' && !entry.projected) {
+      credits.set(entry.bill, (credits.get(entry.bill) ?? 0) + entry.amount);
+    }
     if (entry.projected) {
       projectedCharges.set(
         entry.bill,
@@ -108,6 +116,7 @@ export function summarizeBills(
 
   const result: BillSummary[] = [];
   let previousTotal: Cents | null = null;
+  let previousReliable = true;
   let previousPeriod: BillPeriod | null = null;
 
   for (let month = first; month <= last; month = addMonths(month, 1)) {
@@ -120,7 +129,9 @@ export function summarizeBills(
     let previousBalance = 0;
     if (previousTotal != null && previousPeriod != null) {
       const balance = previousTotal - (paymentsInCycle.get(month) ?? 0);
-      if (isClosed || balance < 0) {
+      if (balance > 0 && !previousReliable) {
+        previousBalance = 0;
+      } else if (isClosed || balance < 0) {
         previousBalance = balance;
       } else if (isOpen && today > previousPeriod.effectiveDueDate) {
         previousBalance = balance;
@@ -134,12 +145,22 @@ export function summarizeBills(
     const paid = isClosed ? (paymentsSoFar.get(addMonths(month, 1)) ?? 0) : 0;
     const nextClosed =
       today >= calendar.period(addMonths(month, 1)).closingDate;
-    const remaining = Math.max(0, total - paid);
+    // A refund that posts after closing lowers what the bank asks for; the
+    // next bill already counts it, so this bill is settled with it.
+    const lateCredits = isClosed ? (credits.get(addMonths(month, 1)) ?? 0) : 0;
+    const shortfall = Math.max(0, total - paid);
+    const complete = historyStart == null || period.startDate >= historyStart;
+    // A cycle the history starts in the middle of misses charges and
+    // payments, so its total is a guess unless the bank or the user gave it.
+    const reliable =
+      complete || providerTotal != null || fact?.userTotal != null;
+    const remaining =
+      shortfall <= lateCredits || (!reliable && paid > 0) ? 0 : shortfall;
 
     let status: BillStatus;
     if (!isClosed) {
       status = isOpen ? 'open' : 'upcoming';
-    } else if (total <= 0 || paid >= total) {
+    } else if (total <= 0 || remaining === 0) {
       status = 'paid';
     } else if (nextClosed) {
       status = paid > 0 ? 'partially_paid' : 'overdue';
@@ -165,12 +186,15 @@ export function summarizeBills(
         paid,
         remaining,
         carriedOver: isClosed && nextClosed && remaining > 0,
+        complete,
       });
     }
 
     // A bill still open or in the future is assumed to be paid in full when
     // it comes due; its balance only carries once it actually closed unpaid.
+    // A guessed total only carries an overpayment forward, never a debt.
     previousTotal = isClosed ? total : ownCharges;
+    previousReliable = reliable;
     previousPeriod = period;
   }
 
