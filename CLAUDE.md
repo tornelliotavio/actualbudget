@@ -3,62 +3,59 @@
 
 # Fork rules
 
-This checkout is a **maintained fork** of [actualbudget/actual](https://github.com/actualbudget/actual),
-not the upstream repo. Everything in `AGENTS.md` still applies for build, test,
-lint, and style conventions — read it first. The rules below are additional and
-specific to this fork.
+This checkout is a **hard fork** of [actualbudget/actual](https://github.com/actualbudget/actual).
+It stopped tracking upstream on 2026-10-14, at upstream `master` @ `358823017`.
+Everything in `AGENTS.md` still applies for build, test, lint, and style
+conventions — read it first. The rules below are additional and specific to
+this fork.
 
 ## Branches
 
 | Branch     | Role                                                                              |
 | ---------- | --------------------------------------------------------------------------------- |
-| `master`   | Mirrors upstream. **Never commit to it.** Only ever fast-forwarded from upstream. |
-| `personal` | Based on upstream `master`; holds all local patches. Work happens here.           |
+| `master`   | Frozen at the last upstream commit the fork was based on. **Never commit to it.** |
+| `personal` | The fork's main line. Work happens here or on feature branches merged into it.    |
 | `deploy`   | Fast-forwarded from `personal`. Railway builds this via `sync-server.Dockerfile`. |
 
 Never commit directly to `master` or `deploy`.
 
-## Patch rules
+## Changing core code
 
-Every commit on `personal` that is not from upstream is a **patch**, and carries
-ongoing rebase cost. Before writing one:
+Upstream compatibility is no longer a constraint. Schema, migrations,
+`loot-core`, the UI and the sync server can all change when a feature needs it;
+there is no reason to work around "not touching the core". What still holds:
 
-1. **Prefer configuration over code.** An env var, a server setting, or an
-   existing feature flag beats a code change every time. Only patch source when
-   no configuration path exists.
-2. **Minimal.** Touch the fewest files and lines that solve the problem. Don't
-   bundle refactors, formatting, renames, or drive-by cleanups into a patch —
-   they turn a trivial rebase into a conflicted one.
-3. **Single-purpose.** One commit per patch, one concern per commit. Two
-   unrelated fixes are two commits, never one, so that either can be dropped
-   independently when upstream fixes it.
-4. **Rebasable onto upstream.** Assume the patch will be replayed onto every
-   future sync of `master`. Avoid depending on incidental upstream details, and
-   prefer additive changes over rewrites of upstream code.
-5. **PR-able upstream where possible.** If a patch is a genuine bug fix or a
-   generally useful feature, send it upstream — an accepted PR is a patch that
-   eventually disappears. Patches that are irreducibly local (instance-specific
-   config, deploy plumbing) stay in the fork; say so explicitly in the inventory.
-6. **Record it.** Every patch gets a row in `fork/PATCHES.md`, including the
-   condition under which it gets dropped. A patch with no drop condition is a
-   patch that will be carried forever by accident.
+1. **Migrations stay additive for one release.** Stale clients of this same
+   instance (a cached browser bundle, the MCP server before it is redeployed)
+   keep sending CRDT messages for the old schema. Stop using a table or column
+   first; drop it in a later release, once every client runs the release that
+   stopped using it.
+2. **Every client ships together.** The sync server, the web client and the MCP
+   server (`packages/mcp-server`, which embeds `loot-core` through
+   `@actual-app/api` and runs a daily bank sync) are deployed from the same
+   commit.
+3. **Synced writes go through CRDT.** Data that must reach other devices is
+   written with `db.insert`/`db.update`/`db.delete_` (or the AQL helpers), never
+   with raw SQL from a migration. Rows two devices may create independently get
+   deterministic ids.
+4. **One concern per commit.** Keep refactors, formatting and features in
+   separate commits so each can be reviewed or reverted on its own.
 
 ## Coding preferences
 
-These apply to all code written in this checkout, patch or not.
+These apply to all code written in this checkout.
 
 - **SOLID.** Single responsibility, dependencies pointing at abstractions, no
   god-objects or grab-bag modules.
 - **Match the surrounding code.** Style, naming, file layout, and idiom come from
   the code you're editing, not from your own defaults.
-- **Follow upstream Actual conventions.** Even in fork-only code. If upstream has
-  an established way to do something, use it — divergence in style makes rebases
-  and upstream PRs harder than they need to be.
+- **Follow Actual conventions.** If the codebase has an established way to do
+  something, use it.
 - **Design for extension.** New code should have the seams to grow along the axes
   it will plausibly grow along, without being speculatively general.
 - **Minimal comments.** Comment only where the code genuinely can't carry the
-  meaning: a non-obvious invariant, a workaround and the reason for it, an
-  upstream quirk. No restating what the line does.
+  meaning: a non-obvious invariant, a workaround and the reason for it, a
+  third-party quirk. No restating what the line does.
 - **Never write comments addressed to the reader-as-requester.** No "as you
   asked", no "per your request", no references to prompts, tasks, or this
   conversation. Comments describe the code, permanently, for whoever reads it
@@ -73,9 +70,11 @@ These apply to all code written in this checkout, patch or not.
 
 ## Fork documentation
 
-- `fork/PATCHES.md` — inventory of every patch on `personal`.
-- `fork/RUNBOOK.md` — syncing onto new upstream code, deploying, testing upstream PRs.
+- `fork/PATCHES.md` — inventory of the changes made while the fork still tracked
+  upstream. Frozen; new work is documented by feature instead.
+- `fork/RUNBOOK.md` — deploying, the MCP connector, production procedures.
 - `fork/NOTES.md` — context about this instance.
+- `fork/credit-cards/` — the native credit card feature: design, data model,
+  Pluggy behaviour per bank.
 
-Keep these current as part of the change, not afterwards: a patch that lands
-without a `fork/PATCHES.md` row is incomplete.
+Keep these current as part of the change, not afterwards.
