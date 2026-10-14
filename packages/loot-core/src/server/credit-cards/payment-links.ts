@@ -22,7 +22,9 @@ type Row = Pick<
   | 'transfer_id'
   | 'imported_id'
   | 'schedule'
->;
+  | 'category'
+  | 'reconciled'
+> & { offbudget: boolean };
 
 export type PaymentLinkResult = {
   linked: number;
@@ -49,6 +51,9 @@ async function select(query: ReturnType<typeof q>): Promise<Row[]> {
       'transfer_id',
       'imported_id',
       'schedule',
+      'category',
+      'reconciled',
+      { offbudget: 'account.offbudget' },
     ]),
   );
   return data as Row[];
@@ -108,14 +113,14 @@ async function link(payment: Row, other: Row) {
   return true;
 }
 
-function nearest(payment: Row, candidates: Row[]): Row[] {
-  if (candidates.length <= 1) {
-    return candidates;
+async function schedulesPaying(cardPayee: string | null) {
+  if (!cardPayee) {
+    return new Set<string>();
   }
-  const distance = (row: Row) =>
-    Math.abs(differenceInCalendarDays(row.date, payment.date));
-  const best = Math.min(...candidates.map(distance));
-  return candidates.filter(row => distance(row) === best);
+  const { data } = await aqlQuery(
+    q('schedules').filter({ _payee: cardPayee }).select(['id']),
+  );
+  return new Set((data as Array<{ id: string }>).map(row => row.id));
 }
 
 /**
@@ -129,12 +134,13 @@ export async function linkCardPayments({
   today = currentDay(),
 }: { today?: string } = {}): Promise<PaymentLinkResult> {
   const result: PaymentLinkResult = { linked: 0, merged: 0, ambiguous: [] };
-  const cards = await db.all<{ id: string }>(
-    "SELECT id FROM accounts WHERE kind = 'credit_card' AND tombstone = 0 AND closed = 0",
+  const cards = await db.all<{ id: string; offbudget: number }>(
+    "SELECT id, offbudget FROM accounts WHERE kind = 'credit_card' AND tombstone = 0 AND closed = 0",
   );
   const cardIds = new Set(cards.map(card => card.id));
 
   for (const card of cards) {
+    const cardSchedules = await schedulesPaying(await transferPayee(card.id));
     const payments = await select(
       q('transactions').filter({
         account: card.id,
@@ -156,6 +162,7 @@ export async function linkCardPayments({
               { date: { $lte: addDays(payment.date, MAX_DAYS_APART) } },
               { starting_balance_flag: false },
               { projected: false },
+              { is_child: false },
             ],
           }),
         )
@@ -180,9 +187,17 @@ export async function linkCardPayments({
         continue;
       }
 
-      const candidates = nearest(
-        payment,
-        others.filter(row => row.transfer_id == null),
+      // Only a bank debit nobody has explained yet: imported, not
+      // reconciled, in an account on the same side of the budget, and
+      // uncategorized or already marked as paying this card.
+      const candidates = others.filter(
+        row =>
+          row.transfer_id == null &&
+          row.imported_id != null &&
+          !row.reconciled &&
+          Boolean(row.offbudget) === (card.offbudget === 1) &&
+          (row.category == null ||
+            (row.schedule != null && cardSchedules.has(row.schedule))),
       );
       if (candidates.length === 1) {
         if (await link(payment, candidates[0])) {

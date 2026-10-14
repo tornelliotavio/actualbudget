@@ -435,4 +435,38 @@ describe('credit card bank sync', () => {
       ),
     ).toEqual({ acct: CHECKING });
   });
+
+  it('does not link a bill payment to a debit already explained', async () => {
+    const group = await db.insertCategoryGroup({ name: 'Casa' });
+    const rent = await db.insertCategory({ name: 'Aluguel', cat_group: group });
+    await db.insertTransaction({
+      id: 'rent',
+      account: CHECKING,
+      date: '2026-10-11',
+      amount: -100000,
+      category: rent,
+      imported_id: 'rent-debit',
+    });
+    respond(CARD, [
+      pluggyTransaction({
+        id: 'card-payment',
+        date: '2026-10-13',
+        amount: 1000,
+        description: 'Pagamento recebido',
+        operationType: 'PAGAMENTO_FATURA',
+      }),
+    ]);
+    await syncCard();
+
+    const payment = (await cardRows()).find(
+      row => row.financial_id === 'card-payment',
+    )!;
+    expect(payment.transferred_id).toBeNull();
+    expect(
+      await db.first(
+        'SELECT transferred_id, category FROM transactions WHERE id = ?',
+        ['rent'],
+      ),
+    ).toEqual({ transferred_id: null, category: rent });
+  });
 });

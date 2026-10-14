@@ -58,8 +58,10 @@ deletes it, and is never made for bills closed before the card became a card
 account (`card_profiles.adjustments_from`), which its starting balance covers.
 
 **Bill payments.** A payment credit on the card is linked to the matching
-debit in another account (same amount, within five days, a single candidate)
-and both become one transfer; a schedule that pays the card within fifteen
+debit in another account and both become one transfer. The debit must be the
+only one with the same amount within five days that is imported, not
+reconciled, not part of a split, on the same side of the budget, and
+uncategorized or linked to a schedule that pays the card; a schedule that pays the card within fifteen
 days is marked paid by it. When the checking side was already a transfer whose
 card half was created locally, the imported credit replaces that half.
 
