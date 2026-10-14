@@ -12,8 +12,7 @@ export type FeatureFlag =
   | 'sankeyReport'
   | 'akahuBankSync'
   | 'mobileCalculator'
-  | 'monteCarloReport'
-  | 'creditCards';
+  | 'monteCarloReport';
 
 /**
  * Cross-device preferences. These sync across devices when they are changed.
@@ -69,7 +68,6 @@ export type SyncedPrefs = Partial<
     | `camt-swap-payee-memo-${string}`
     | `flip-amount-${string}-${'csv' | 'qif'}`
     | `flags.${FeatureFlag}`
-    | 'credit-cards-schema-version'
     | `learn-categories`
     | `show-hidden-tags`,
     string

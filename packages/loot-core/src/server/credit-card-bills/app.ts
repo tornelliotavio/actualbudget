@@ -1,4 +1,5 @@
 import * as asyncStorage from '#platform/server/asyncStorage';
+import { createApp } from '#server/app';
 import * as db from '#server/db';
 import { post } from '#server/post';
 import { getPrefs } from '#server/prefs';
@@ -23,13 +24,17 @@ type PluggyBill = {
   paidAmount: number;
 };
 
+export type CreditCardBillsHandlers = {
+  'pluggyai-bills': typeof getPluggyAiBills;
+};
+
 /**
  * The card's closed bills (faturas), oldest due date first. Accounts not
  * synced through Pluggy, and Pluggy accounts that aren't credit cards, have
  * none. Failures come back as `{ error }` rather than throwing, because a
  * thrown handler error surfaces in the app as an internal error.
  */
-export async function getPluggyAiBills({
+async function getPluggyAiBills({
   id,
 }: {
   id: AccountEntity['id'];
@@ -87,3 +92,6 @@ export async function getPluggyAiBills({
     paidAmount: amountToInteger(bill.paidAmount),
   }));
 }
+
+export const app = createApp<CreditCardBillsHandlers>();
+app.method('pluggyai-bills', getPluggyAiBills);

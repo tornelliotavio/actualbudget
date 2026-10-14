@@ -12,7 +12,6 @@ import { closeModal } from '#modals/modalsSlice';
 import { useDispatch } from '#redux';
 
 import { EditSyncAccount } from './banksync/EditSyncAccount';
-import { CreateCardModal } from './credit-cards/CreateCardModal';
 import { AccountAutocompleteModal } from './modals/AccountAutocompleteModal';
 import { AccountGroupsModal } from './modals/AccountGroupsModal';
 import { AccountMenuModal } from './modals/AccountMenuModal';
@@ -132,9 +131,6 @@ export function Modals() {
 
         case 'import-transactions':
           return <ImportTransactionsModal key={key} {...modal.options} />;
-
-        case 'credit-card-create':
-          return <CreateCardModal key={key} />;
 
         case 'add-account':
           return <CreateAccountModal key={key} {...modal.options} />;

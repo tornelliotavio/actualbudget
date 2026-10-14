@@ -250,9 +250,6 @@ export function ExperimentalFeatures() {
             >
               <Trans>Akahu Bank Sync (NZ banks)</Trans>
             </FeatureToggle>
-            <FeatureToggle flag="creditCards">
-              <Trans>Credit cards</Trans>
-            </FeatureToggle>
             {showServerPrefs && (
               <ServerFeatureToggle
                 prefName="flags.plugins"
