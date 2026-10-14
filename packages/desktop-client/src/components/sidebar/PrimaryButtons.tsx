@@ -16,6 +16,7 @@ import {
 import { SvgCalendar3 } from '@actual-app/components/icons/v2';
 import { View } from '@actual-app/components/view';
 
+import { useAccounts } from '#hooks/useAccounts';
 import { useIsTestEnv } from '#hooks/useIsTestEnv';
 import { useSyncServerStatus } from '#hooks/useSyncServerStatus';
 
@@ -31,6 +32,10 @@ export function PrimaryButtons() {
   const syncServerStatus = useSyncServerStatus();
   const isTestEnv = useIsTestEnv();
   const isUsingServer = syncServerStatus !== 'no-server' || isTestEnv;
+  const { data: accounts = [] } = useAccounts();
+  const hasCards = accounts.some(
+    account => account.kind === 'credit_card' && !account.closed,
+  );
 
   const isActive = [
     '/payees',
@@ -51,6 +56,9 @@ export function PrimaryButtons() {
       <Item title={t('Budget')} Icon={SvgWallet} to="/budget" />
       <Item title={t('Reports')} Icon={SvgReports} to="/reports" />
       <Item title={t('Schedules')} Icon={SvgCalendar3} to="/schedules" />
+      {hasCards && (
+        <Item title={t('Credit cards')} Icon={SvgCreditCard} to="/cards" />
+      )}
       <Item
         title={t('More')}
         Icon={isOpen ? SvgCheveronDown : SvgCheveronRight}

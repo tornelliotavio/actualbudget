@@ -13,17 +13,9 @@ const CARD_TABLES = [
   'accounts',
 ];
 
-/** Bills of a credit card account, kept current as its data changes. */
-export function useCardBills(accountId: AccountEntity['id'] | undefined) {
-  const query = useQuery<CardBillsResult>({
-    queryKey: ['credit-card-bills', accountId],
-    queryFn: () => send('credit-card-bills', { accountId: accountId! }),
-    enabled: accountId != null,
-  });
-  const { refetch } = query;
-
+function useRefetchOnCardChanges(refetch: () => unknown, enabled: boolean) {
   useEffect(() => {
-    if (accountId == null) {
+    if (!enabled) {
       return;
     }
     return listen('sync-event', event => {
@@ -34,7 +26,34 @@ export function useCardBills(accountId: AccountEntity['id'] | undefined) {
         void refetch();
       }
     });
-  }, [accountId, refetch]);
+  }, [refetch, enabled]);
+}
 
+/** Bills of a credit card account, kept current as its data changes. */
+export function useCardBills(accountId: AccountEntity['id'] | undefined) {
+  const query = useQuery<CardBillsResult>({
+    queryKey: ['credit-card-bills', accountId],
+    queryFn: () => send('credit-card-bills', { accountId: accountId! }),
+    enabled: accountId != null,
+  });
+  useRefetchOnCardChanges(query.refetch, accountId != null);
+  return query;
+}
+
+/** Bills of several card accounts, in the order given. */
+export function useAllCardBills(accountIds: Array<AccountEntity['id']>) {
+  const query = useQuery({
+    queryKey: ['credit-card-bills-all', ...accountIds],
+    queryFn: () =>
+      Promise.all(
+        accountIds.map(accountId =>
+          send('credit-card-bills', { accountId }).then(result => ({
+            accountId,
+            result,
+          })),
+        ),
+      ),
+  });
+  useRefetchOnCardChanges(query.refetch, true);
   return query;
 }
