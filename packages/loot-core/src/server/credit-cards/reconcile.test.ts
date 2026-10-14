@@ -507,4 +507,25 @@ describe('reconcileCardAccount', () => {
       ),
     ).toEqual({ card_bill: null, card_kind: null, budget_date: null });
   });
+
+  it('reconciles a card after a file import', async () => {
+    const accountId = await createCard();
+    await accountsApp.handlers['transactions-import']({
+      accountId,
+      transactions: [
+        {
+          account: accountId,
+          date: '2026-10-10',
+          amount: -5000,
+          notes: 'LOJA',
+        },
+      ],
+      isPreview: false,
+    });
+    const [row] = await cardRows(accountId);
+    expect(row).toMatchObject({
+      card_bill: `${accountId}:2026-11`,
+      budget_date: 20261112,
+    });
+  });
 });

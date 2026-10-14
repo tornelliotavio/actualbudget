@@ -43,6 +43,7 @@ import { aqlQuery } from './aql';
 import { isTrackingBudget } from './budget/actions';
 import * as cloudStorage from './cloud-storage';
 import type { RemoteFile } from './cloud-storage';
+import { reconcileCardAccount } from './credit-cards/reconcile';
 import * as db from './db';
 import { APIError, withErrorCode } from './errors';
 import { runMutator } from './mutators';
@@ -556,6 +557,7 @@ handlers['api/transactions-add'] = withMutation(async function ({
     runTransfers,
     learnCategories,
   });
+  await reconcileCardAccount(accountId);
   return 'ok' as const;
 });
 

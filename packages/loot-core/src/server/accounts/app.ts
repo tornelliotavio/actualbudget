@@ -7,6 +7,7 @@ import { logger } from '#platform/server/log';
 import { createApp } from '#server/app';
 import { makeCreditCardAccount } from '#server/credit-cards/profiles';
 import type { CardSettingsInput } from '#server/credit-cards/profiles';
+import { reconcileCardAccount } from '#server/credit-cards/reconcile';
 import * as db from '#server/db';
 import {
   APIError,
@@ -1696,6 +1697,9 @@ async function importTransactions({
         payeeNameNormalization,
       },
     );
+    if (!isPreview) {
+      await reconcileCardAccount(accountId);
+    }
     return {
       errors: [],
       added: reconciled.added,

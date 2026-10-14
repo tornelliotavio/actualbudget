@@ -32,7 +32,7 @@ export type TransactionHandlers = {
   'transactions-parse-file': typeof parseTransactionsFile;
   'transactions-export': typeof exportTransactions;
   'transactions-export-query': typeof exportTransactionsQuery;
-  'transactions-merge': typeof mergeTransactions;
+  'transactions-merge': typeof mergeAndReconcileCards;
   'get-earliest-transaction': typeof getEarliestTransaction;
   'get-latest-transaction': typeof getLatestTransaction;
 };
@@ -61,6 +61,16 @@ async function handleBatchUpdateTransactions({
   );
 
   return result;
+}
+
+async function mergeAndReconcileCards(
+  transactions: Parameters<typeof mergeTransactions>[0],
+) {
+  const ids = transactions.map(transaction => transaction.id);
+  const cardsBefore = await cardAccountsOf(ids);
+  const keptId = await mergeTransactions(transactions);
+  await reconcileCardsTouchedBy([keptId], cardsBefore);
+  return keptId;
 }
 
 async function addTransaction(transaction: TransactionEntity) {
@@ -168,7 +178,7 @@ app.method(
   'transactions-batch-update',
   mutator(undoable(handleBatchUpdateTransactions)),
 );
-app.method('transactions-merge', mutator(undoable(mergeTransactions)));
+app.method('transactions-merge', mutator(undoable(mergeAndReconcileCards)));
 
 app.method('transaction-add', mutator(addTransaction));
 app.method('transaction-update', mutator(updateTransaction));
