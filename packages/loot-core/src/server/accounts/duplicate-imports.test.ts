@@ -63,4 +63,32 @@ describe('mergeDuplicateImports', () => {
     );
     expect(await runMutator(() => mergeDuplicateImports(accountId))).toBe(0);
   });
+
+  it('leaves a copy the user changed', async () => {
+    const accountId = await accountsApp.handlers['account-create']({
+      name: 'Conta',
+    });
+    await runMutator(async () => {
+      await db.insertTransaction({
+        id: 'bank',
+        account: accountId,
+        date: '2026-10-13',
+        amount: -10000,
+        imported_id: 'bank-1',
+      });
+      await db.insertTransaction({
+        id: 'my-share',
+        account: accountId,
+        date: '2026-10-13',
+        amount: -2500,
+        notes: 'my share',
+        imported_id: 'bank-1',
+      });
+    });
+
+    expect(await runMutator(() => mergeDuplicateImports(accountId))).toBe(0);
+    expect((await rows(accountId)).map(row => row.amount)).toEqual([
+      -10000, -2500,
+    ]);
+  });
 });
