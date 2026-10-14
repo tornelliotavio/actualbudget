@@ -8,6 +8,7 @@ import React, {
 import { useTranslation } from 'react-i18next';
 import { useSearchParams } from 'react-router';
 
+import { View } from '@actual-app/components/view';
 import { send } from '@actual-app/core/platform/client/connection';
 import type { Query } from '@actual-app/core/shared/query';
 import { isPreviewId } from '@actual-app/core/shared/transactions';
@@ -23,6 +24,7 @@ import {
 } from '#accounts';
 import { markAccountRead } from '#accounts/accountsSlice';
 import * as reconciliation from '#accounts/reconciliation';
+import { CardBillPanel } from '#components/credit-cards/CardBillPanel';
 import { ReconcilingBanner } from '#components/mobile/accounts/ReconcilingBanner';
 import { TransactionListWithBalances } from '#components/mobile/transactions/TransactionListWithBalances';
 import { useAccountPreviewTransactions } from '#hooks/useAccountPreviewTransactions';
@@ -68,6 +70,7 @@ function TransactionListWithPreviews({
   const { t } = useTranslation();
   const dateFormat = useDateFormat() || 'MM/dd/yyyy';
   const dispatch = useDispatch();
+  const [cardBillMonth, setCardBillMonth] = useState<string | null>(null);
   const navigate = useNavigate();
 
   const [showRunningBalances] = useSyncedPref(`show-balances-${account.id}`);
@@ -314,6 +317,25 @@ function TransactionListWithPreviews({
           onDone={onDoneReconciling}
           onCreateTransaction={onCreateReconciliationTransaction}
         />
+      )}
+      {account.kind === 'credit_card' && (
+        <View style={{ padding: '8px 10px 0' }}>
+          <CardBillPanel
+            account={account}
+            month={cardBillMonth}
+            onChangeMonth={setCardBillMonth}
+            onOpenSettings={() =>
+              dispatch(
+                pushModal({
+                  modal: {
+                    name: 'card-settings',
+                    options: { accountId: account.id },
+                  },
+                }),
+              )
+            }
+          />
+        </View>
       )}
       <TransactionListWithBalances
         isLoading={

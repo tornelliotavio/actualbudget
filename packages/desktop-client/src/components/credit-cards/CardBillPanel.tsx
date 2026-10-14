@@ -31,10 +31,11 @@ type CardBillPanelProps = {
   account: AccountEntity;
   /** Bill shown; `null` shows the one the card is on now. */
   month: string | null;
-  showOnlyBill: boolean;
   onChangeMonth: (month: string) => void;
-  onToggleShowOnlyBill: (showOnlyBill: boolean, month: string) => void;
   onOpenSettings: () => void;
+  /** Present where the register can be narrowed to one bill. */
+  showOnlyBill?: boolean;
+  onToggleShowOnlyBill?: (showOnlyBill: boolean, month: string) => void;
 };
 
 /**
@@ -117,19 +118,21 @@ export function CardBillPanel({
           gap: 10,
         }}
       >
-        <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
-          <Toggle
-            id={`card-bill-only-${account.id}`}
-            isOn={showOnlyBill}
-            onToggle={isOn => onToggleShowOnlyBill(isOn, bill.referenceMonth)}
-          />
-          <label
-            htmlFor={`card-bill-only-${account.id}`}
-            style={{ ...styles.smallText, color: theme.pageTextSubdued }}
-          >
-            <Trans>Show only this bill's transactions</Trans>
-          </label>
-        </View>
+        {onToggleShowOnlyBill && (
+          <View style={{ flexDirection: 'row', alignItems: 'center', gap: 6 }}>
+            <Toggle
+              id={`card-bill-only-${account.id}`}
+              isOn={!!showOnlyBill}
+              onToggle={isOn => onToggleShowOnlyBill(isOn, bill.referenceMonth)}
+            />
+            <label
+              htmlFor={`card-bill-only-${account.id}`}
+              style={{ ...styles.smallText, color: theme.pageTextSubdued }}
+            >
+              <Trans>Show only this bill's transactions</Trans>
+            </label>
+          </View>
+        )}
         <View style={{ flexDirection: 'row', alignItems: 'center', gap: 10 }}>
           <LimitSummary limit={data.limit} />
           <Button variant="bare" onPress={onOpenSettings}>
