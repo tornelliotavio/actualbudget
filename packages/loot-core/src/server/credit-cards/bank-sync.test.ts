@@ -395,4 +395,27 @@ describe('credit card bank sync', () => {
     );
     expect(rows).toHaveLength(1);
   });
+
+  it('leaves a bank transaction the user moved to another account', async () => {
+    const charge = pluggyTransaction({
+      id: 'market',
+      date: '2026-10-10',
+      amount: -50,
+      description: 'MERCADO',
+    });
+    respond(CARD, [charge]);
+    await syncCard();
+    const [row] = await cardRows();
+    await db.updateTransaction({ id: row.id, account: CHECKING });
+
+    await syncCard();
+
+    expect(await cardRows()).toEqual([]);
+    expect(
+      await db.first<{ acct: string }>(
+        'SELECT acct FROM transactions WHERE id = ?',
+        [row.id],
+      ),
+    ).toEqual({ acct: CHECKING });
+  });
 });

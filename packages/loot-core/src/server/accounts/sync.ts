@@ -772,9 +772,15 @@ export async function reconcileTransactions(
     } else {
       // Insert a new transaction
       const { forceAddTransaction: _forceAddTransaction, ...newTrans } = trans;
+      const id = importedTransactionId(acctId, trans, isBankSyncAccount);
+      if (await isAliveTransaction(id)) {
+        // The user moved this bank transaction to another account; inserting
+        // under its deterministic id would pull it back.
+        continue;
+      }
       const finalTransaction = {
         ...newTrans,
-        id: importedTransactionId(acctId, trans, isBankSyncAccount),
+        id,
         // A deterministic id may belong to a transaction deleted earlier.
         tombstone: false,
         category: trans.category || null,
@@ -823,6 +829,14 @@ const IMPORTED_TRANSACTION_NAMESPACE = '4f9d2b8e-61a3-4c7e-9b0d-3e5a7c1f2d84';
  * id, so two devices importing the same transaction at once write the same
  * row instead of two copies.
  */
+async function isAliveTransaction(id: string) {
+  const row = await db.first<{ tombstone: number }>(
+    'SELECT tombstone FROM transactions WHERE id = ?',
+    [id],
+  );
+  return row != null && !row.tombstone;
+}
+
 function importedTransactionId(acctId, trans, isBankSyncAccount: boolean) {
   if (!isBankSyncAccount || !trans.imported_id) {
     return uuidv4();
