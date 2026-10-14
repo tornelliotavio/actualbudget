@@ -41,6 +41,7 @@ import type {
   TransactionEntity,
 } from '#types/models';
 
+import { mergeDuplicateImports } from './duplicate-imports';
 import { getStartingBalancePayee } from './payees';
 import { title } from './title';
 
@@ -1309,6 +1310,8 @@ async function processBankSyncDownload(
         refreshRawSyncedData: isCard,
       },
     );
+
+    await mergeDuplicateImports(id);
 
     if (currentBalance != null) {
       await updateAccountBalance(id, currentBalance);
