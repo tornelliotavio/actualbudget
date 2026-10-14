@@ -47,6 +47,8 @@ export function accountFilter(
         [`${field}.offbudget`]: false,
         category: null,
         is_parent: false,
+        // A projected installment is categorized when its bill arrives.
+        projected: false,
         $or: [
           {
             'payee.transfer_acct.offbudget': true,
@@ -126,6 +128,7 @@ export function uncategorizedTransactions() {
   return q('transactions').filter({
     'account.offbudget': false,
     category: null,
+    projected: false,
     $or: [
       {
         'payee.transfer_acct.offbudget': true,
