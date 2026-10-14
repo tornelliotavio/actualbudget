@@ -16,9 +16,27 @@ export type CardBill = BillSummary & {
   providerBillId: string | null;
 };
 
+export type CardLimit = {
+  /** The user's figure, otherwise the bank's. */
+  total: number | null;
+  /** What the card owes, projected installments included. */
+  used: number;
+  available: number | null;
+};
+
 export type CardBillsResult =
-  | { status: 'ok'; bills: CardBill[]; currentMonth: string | null }
-  | { status: 'not-a-card' | 'needs-schedule'; bills: []; currentMonth: null };
+  | {
+      status: 'ok';
+      bills: CardBill[];
+      currentMonth: string | null;
+      limit: CardLimit;
+    }
+  | {
+      status: 'not-a-card' | 'needs-schedule';
+      bills: [];
+      currentMonth: null;
+      limit: CardLimit | null;
+    };
 
 const OPEN_LIKE: BillStatus[] = ['open', 'upcoming'];
 
@@ -90,11 +108,17 @@ export async function getCardBills(
 ): Promise<CardBillsResult> {
   const state = await loadCardAccountState(accountId);
   if (!state) {
-    return { status: 'not-a-card', bills: [], currentMonth: null };
+    return {
+      status: 'not-a-card',
+      bills: [],
+      currentMonth: null,
+      limit: null,
+    };
   }
+  const limit = cardLimit(state);
   const calendar = calendarFor(state);
   if (!calendar) {
-    return { status: 'needs-schedule', bills: [], currentMonth: null };
+    return { status: 'needs-schedule', bills: [], currentMonth: null, limit };
   }
 
   const openMonth = calendar.monthForDate(today);
@@ -122,5 +146,16 @@ export async function getCardBills(
     status: 'ok',
     bills,
     currentMonth: unpaid?.referenceMonth ?? openMonth,
+    limit,
   };
+}
+
+function cardLimit(state: CardAccountState): CardLimit {
+  const total =
+    state.profile?.credit_limit_user ?? state.account.balance_limit ?? null;
+  const used = -state.transactions.reduce(
+    (sum, transaction) => sum + transaction.amount,
+    0,
+  );
+  return { total, used, available: total == null ? null : total - used };
 }

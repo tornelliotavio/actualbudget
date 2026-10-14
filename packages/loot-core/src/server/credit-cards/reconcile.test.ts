@@ -357,4 +357,31 @@ describe('reconcileCardAccount', () => {
       budget_date: 20261212,
     });
   });
+
+  it('reports the limit used, projected installments included', async () => {
+    const accountId = await accountsApp.handlers['account-create']({
+      name: 'Cartão',
+      kind: 'credit_card',
+      card: { closingDay: 5, dueDay: 12, creditLimit: 224000 },
+    });
+    await addTransaction({
+      account: accountId,
+      date: '2026-10-10',
+      amount: -10000,
+      notes: 'LOJA X',
+      imported_id: 'pluggy-1',
+      raw_synced_data: pluggyRaw({
+        description: 'LOJA X',
+        'creditCardMetadata.installmentNumber': 1,
+        'creditCardMetadata.totalInstallments': 2,
+      }),
+    });
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+    const result = await getCardBills(accountId, { today: TODAY });
+    expect(result.limit).toEqual({
+      total: 224000,
+      used: 20000,
+      available: 204000,
+    });
+  });
 });
