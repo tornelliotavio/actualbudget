@@ -827,7 +827,8 @@ class AccountInternal extends PureComponent<
       | 'toggle-reconciled'
       | 'toggle-net-worth-chart'
       | 'manage-columns'
-      | 'account-group',
+      | 'account-group'
+      | 'make-credit-card',
   ) => {
     const accountId = this.props.accountId!;
     const account = this.props.accounts.find(
@@ -865,6 +866,9 @@ class AccountInternal extends PureComponent<
         break;
       case 'close':
         void this.props.dispatch(openAccountCloseModal({ accountId }));
+        break;
+      case 'make-credit-card':
+        await send('credit-card-make', { accountId });
         break;
       case 'account-group':
         this.props.dispatch(

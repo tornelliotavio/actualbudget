@@ -734,7 +734,8 @@ type AccountMenuProps = {
       | 'toggle-reconciled'
       | 'toggle-net-worth-chart'
       | 'manage-columns'
-      | 'account-group',
+      | 'account-group'
+      | 'make-credit-card',
   ) => void;
 };
 
@@ -790,6 +791,14 @@ function AccountMenu({
             : t('Show reconciled transactions'),
         },
         { name: 'export', text: t('Export') },
+        ...(account.kind !== 'credit_card' && !account.closed
+          ? [
+              {
+                name: 'make-credit-card',
+                text: t('Turn into a credit card'),
+              } as const,
+            ]
+          : []),
         ...(account && !account.closed
           ? canSync
             ? [
