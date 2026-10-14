@@ -15,12 +15,13 @@ type ImportedRow = {
 
 /** What bank sync wrote; a copy the user edited differs in one of these. */
 function importSignature(row: ImportedRow) {
+  // Older imports stored a missing description as '' or as null.
   return JSON.stringify([
     row.date,
     row.amount,
-    row.notes,
-    row.imported_description,
-    row.raw_synced_data,
+    row.notes || null,
+    row.imported_description || null,
+    row.raw_synced_data || null,
   ]);
 }
 

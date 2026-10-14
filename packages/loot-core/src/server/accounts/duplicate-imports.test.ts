@@ -44,6 +44,7 @@ describe('mergeDuplicateImports', () => {
         date: '2026-10-13',
         amount: -11385,
         imported_id: 'bank-1',
+        imported_payee: '',
         category,
       });
       await db.insertTransaction({
