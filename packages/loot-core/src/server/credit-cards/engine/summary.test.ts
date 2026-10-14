@@ -149,9 +149,13 @@ describe('summarizeBills', () => {
     const [november, december] = summarizeBills(
       calendar,
       [
-        charge('2026-10-20', 91282, '2026-11'),
+        { ...charge('2026-10-20', 91282, '2026-11'), stem: 'APPLE.COM/BILL' },
         payment('2026-11-11', 90824),
-        { ...charge('2026-11-08', -458, '2026-12'), kind: 'credit' as const },
+        {
+          ...charge('2026-11-08', -458, '2026-12'),
+          kind: 'credit' as const,
+          stem: 'APPLE.COM/BILL',
+        },
       ],
       [],
       ['2026-11', '2026-12'],
@@ -244,5 +248,27 @@ describe('summarizeBills', () => {
     );
     expect(november).toMatchObject({ paid: 0, status: 'overdue' });
     expect(december).toMatchObject({ paid: 2000 });
+  });
+
+  it('does not settle a bill with an unrelated refund', () => {
+    const [november] = summarizeBills(
+      calendar,
+      [
+        { ...charge('2026-10-20', 100000, '2026-11'), stem: 'LOJA X' },
+        payment('2026-11-11', 90000),
+        {
+          ...charge('2026-11-08', -10000, '2026-12'),
+          kind: 'credit' as const,
+          stem: 'OUTRA LOJA',
+        },
+      ],
+      [],
+      ['2026-11', '2026-12'],
+      '2026-11-20',
+    );
+    expect(november).toMatchObject({
+      remaining: 10000,
+      status: 'overdue',
+    });
   });
 });

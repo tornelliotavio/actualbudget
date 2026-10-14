@@ -4,6 +4,7 @@ import type { AccountEntity } from '#types/models';
 import { calendarFor, classifyOptions, toCardEntry } from './card-entries';
 import type { BillCalendar } from './engine/bill-calendar';
 import { classifyEntry } from './engine/classify';
+import { descriptionStem } from './engine/installments';
 import type { BillStatus, BillSummary, SummaryEntry } from './engine/summary';
 import { summarizeBills } from './engine/summary';
 import type { DateString } from './engine/types';
@@ -63,6 +64,7 @@ export function summarizeCardState(
         bill: entry.stored.bill ?? calendar.monthForDate(entry.date),
         projected: entry.projected,
         pinned: entry.stored.billSource === 'user',
+        stem: descriptionStem(entry.description),
       };
     });
 

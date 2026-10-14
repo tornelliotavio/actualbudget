@@ -26,6 +26,8 @@ export type SummaryEntry = {
   projected: boolean;
   /** The user put this transaction on `bill`. */
   pinned?: boolean;
+  /** Description stem, to tell which purchase a refund is for. */
+  stem?: string;
 };
 
 export type BillFacts = {
@@ -83,7 +85,11 @@ export function summarizeBills(
   const factsByMonth = new Map(facts.map(fact => [fact.referenceMonth, fact]));
 
   const charges = new Map<MonthString, Cents>();
-  const credits = new Map<MonthString, Cents>();
+  const credits = new Map<
+    MonthString,
+    Array<{ stem?: string; amount: Cents }>
+  >();
+  const chargedStems = new Map<MonthString, Set<string>>();
   const projectedCharges = new Map<MonthString, Cents>();
   const paymentsInCycle = new Map<MonthString, Cents>();
   const paymentsSoFar = new Map<MonthString, Cents>();
@@ -110,7 +116,15 @@ export function summarizeBills(
     const owed = -entry.amount;
     charges.set(entry.bill, (charges.get(entry.bill) ?? 0) + owed);
     if (entry.kind === 'credit' && !entry.projected) {
-      credits.set(entry.bill, (credits.get(entry.bill) ?? 0) + entry.amount);
+      credits.set(entry.bill, [
+        ...(credits.get(entry.bill) ?? []),
+        { stem: entry.stem, amount: entry.amount },
+      ]);
+    } else if (entry.stem && entry.amount < 0) {
+      chargedStems.set(
+        entry.bill,
+        new Set([...(chargedStems.get(entry.bill) ?? []), entry.stem]),
+      );
     }
     if (entry.projected) {
       projectedCharges.set(
@@ -153,7 +167,12 @@ export function summarizeBills(
       today >= calendar.period(addMonths(month, 1)).closingDate;
     // A refund that posts after closing lowers what the bank asks for; the
     // next bill already counts it, so this bill is settled with it.
-    const lateCredits = isClosed ? (credits.get(addMonths(month, 1)) ?? 0) : 0;
+    const ownStems = chargedStems.get(month);
+    const lateCredits = isClosed
+      ? (credits.get(addMonths(month, 1)) ?? [])
+          .filter(credit => credit.stem && ownStems?.has(credit.stem))
+          .reduce((sum, credit) => sum + credit.amount, 0)
+      : 0;
     const shortfall = Math.max(0, total - paid);
     const complete = historyStart == null || period.startDate >= historyStart;
     // A cycle the history starts in the middle of misses charges and
