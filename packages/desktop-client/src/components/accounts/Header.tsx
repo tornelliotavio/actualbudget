@@ -110,6 +110,8 @@ type AccountHeaderProps = {
     typeof SelectedTransactionsButton
   >['onUnlinkSchedule'];
   onApplyFilter: (filter: RuleConditionEntity) => void;
+  /** Bill summary shown under the balances of a credit card account. */
+  cardPanel?: ReactNode;
 } & Pick<
   ComponentProps<typeof SelectedTransactionsButton>,
   | 'onCreateRule'
@@ -181,6 +183,7 @@ export function AccountHeader({
   onMakeAsSplitTransaction,
   onMakeAsNonSplitTransactions,
   onMergeTransactions,
+  cardPanel,
 }: AccountHeaderProps) {
   const { t } = useTranslation();
 
@@ -318,6 +321,7 @@ export function AccountHeader({
               isFiltered={isFiltered}
               filteredAmount={filteredAmount}
             />
+            {cardPanel}
           </View>
 
           <BalanceHistoryGraph

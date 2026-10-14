@@ -47,6 +47,7 @@ import {
 } from '#accounts';
 import { markAccountRead } from '#accounts/accountsSlice';
 import * as reconciliation from '#accounts/reconciliation';
+import { CardBillPanel } from '#components/credit-cards/CardBillPanel';
 import { FeatureErrorFallback } from '#components/FeatureErrorFallback';
 import type { SavedFilter } from '#components/filters/SavedFilterMenuButton';
 import type {
@@ -297,6 +298,10 @@ type AccountInternalState = {
     prevAscDesc?: 'asc' | 'desc' | undefined;
   } | null;
   filteredAmount: null | number;
+  /** Bill shown on a card account; `null` is the card's current bill. */
+  cardBillMonth: string | null;
+  /** The register lists only the transactions of `cardBillMonth`. */
+  showOnlyCardBill: boolean;
 };
 
 export type TableRef = RefObject<{
@@ -341,6 +346,8 @@ class AccountInternal extends PureComponent<
       isAdding: false,
       sort: null,
       filteredAmount: null,
+      cardBillMonth: null,
+      showOnlyCardBill: false,
     };
   }
 
@@ -476,8 +483,40 @@ class AccountInternal extends PureComponent<
 
   makeRootTransactionsQuery = () => {
     const accountId = this.props.accountId;
+    const query = queries.transactions(accountId);
 
-    return queries.transactions(accountId);
+    if (this.isShowingOnlyCardBill()) {
+      return query.filter({
+        card_bill: `${accountId}:${this.state.cardBillMonth}`,
+      });
+    }
+    return query;
+  };
+
+  isShowingOnlyCardBill = () =>
+    this.state.showOnlyCardBill && this.state.cardBillMonth != null;
+
+  onChangeCardBill = (month: string) => {
+    this.setState({ cardBillMonth: month }, () => {
+      if (this.state.showOnlyCardBill) {
+        this.fetchTransactions(this.state.filterConditions);
+      }
+    });
+  };
+
+  onToggleShowOnlyCardBill = (showOnlyCardBill: boolean, month: string) => {
+    this.setState({ showOnlyCardBill, cardBillMonth: month }, () =>
+      this.fetchTransactions(this.state.filterConditions),
+    );
+  };
+
+  onOpenCardSettings = () => {
+    const accountId = this.props.accountId;
+    if (accountId) {
+      this.props.dispatch(
+        pushModal({ modal: { name: 'card-settings', options: { accountId } } }),
+      );
+    }
   };
 
   updateQuery(query: Query, isFiltered: boolean = false) {
@@ -584,6 +623,8 @@ class AccountInternal extends PureComponent<
           showCleared: nextProps.showCleared,
           showReconciled: nextProps.showReconciled,
           reconcileAmount: null,
+          cardBillMonth: null,
+          showOnlyCardBill: false,
         },
         () => {
           this.fetchTransactions();
@@ -700,6 +741,7 @@ class AccountInternal extends PureComponent<
     if (!account) return false;
     if (this.state.search !== '') return false;
     if (this.state.filterConditions.length > 0) return false;
+    if (this.isShowingOnlyCardBill()) return false;
     if (this.state.sort === null) {
       return true;
     } else {
@@ -1930,6 +1972,18 @@ class AccountInternal extends PureComponent<
                 onMakeAsSplitTransaction={this.onMakeAsSplitTransaction}
                 onMakeAsNonSplitTransactions={this.onMakeAsNonSplitTransactions}
                 onMergeTransactions={this.onMergeTransactions}
+                cardPanel={
+                  account?.kind === 'credit_card' ? (
+                    <CardBillPanel
+                      account={account}
+                      month={this.state.cardBillMonth}
+                      showOnlyBill={this.state.showOnlyCardBill}
+                      onChangeMonth={this.onChangeCardBill}
+                      onToggleShowOnlyBill={this.onToggleShowOnlyCardBill}
+                      onOpenSettings={this.onOpenCardSettings}
+                    />
+                  ) : undefined
+                }
               />
 
               <View style={{ flex: 1 }}>
