@@ -40,12 +40,8 @@ purchases authorized in the last day or two that Open Finance hasn't delivered
 yet. Compare the card balance with the open bills, never adjust a starting
 balance to match the used limit.
 
-The credit card module stores card, bill and installment metadata in
-`credit_card_*` tables and reads Actual's transactions as the ledger. It does
-not insert projected installments and does not change an account balance. The
-flag `creditCards` stays off until someone turns it on in Settings →
-Experimental. Recovery if a stock Actual build refuses the budget is in
-`fork/credit-cards/RECOVERY.md`.
+Credit cards are native accounts (`fork/credit-cards/`). Bills, installments
+and bill payments are derived from the Pluggy data during bank sync.
 
 ## Categories
 
@@ -124,13 +120,11 @@ the explicit unknown bucket) are explained in the notebook.
 - The tracking Balance Forecast adds the current month's whole budget on top
   of a balance that already contains this month's actuals, so mid-month it
   runs high (`server/forecast/forecast-tracking-budget.ts`).
-- Actual re-dates Pluggy card installments: PGZ installments show every two
-  months through 2028 while the feed has them monthly through 2027-04.
-  `getTransactionDateCorrected` in `app-pluggyai.js` is unchanged. The credit
-  card module (flag `creditCards`, off) ignores that shifted date and reads
-  `originalDate` plus `creditCardMetadata` from `raw_synced_data`. The account
-  register still shows the shifted dates until that function is fixed on its
-  own.
+- Actual re-dated Pluggy card installments: PGZ installments showed every two
+  months through 2028 while the feed had them monthly through 2027-04. The cause
+  was `getTransactionDateCorrected` in `app-pluggyai.js`, which shifted a date
+  the bank had already moved to the posting date. Card installments are now
+  dated from the purchase and the bill they belong to (`fork/credit-cards/`).
 
 ## History
 

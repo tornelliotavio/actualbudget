@@ -213,11 +213,38 @@ it, import a backup zip with the API, and upload it.
 
 ## 5. Credit cards
 
-The first credit card module (flag `creditCards`) was removed on 2026-10-14. Its
-migrations `1791656900000` and `1791656901000` stay, and the `credit_card_*`
-tables they created are no longer read or written. They are dropped in a later
-release, once the web client and the MCP connector both run a build without
-the old module (`CLAUDE.md`, "Changing core code").
+Credit cards are native accounts. Design and data model:
+`fork/credit-cards/README.md`.
 
-Credit cards are now native accounts. Design and data model:
-`fork/credit-cards/`.
+The first credit card module (flag `creditCards`) was removed on 2026-10-14. Its
+migrations `1791656900000` and `1791656901000` stay. The `credit_card_*` tables
+they created are only read once per card, to seed its closing and due days
+when it becomes a card account. They are dropped in a later release, once the
+web client and the MCP connector both run a build without the old module
+(`CLAUDE.md`, "Changing core code"); the seeding goes with them.
+
+### Rolling out native cards
+
+1. Download a backup of the budget (Settings → Export) and keep it.
+2. Deploy the sync server and the MCP connector from the same commit (§2, §4).
+   The MCP connector's daily bank sync runs the new code too; an old connector
+   would keep importing without bills.
+3. Reload the web app on every device so no cached bundle stays on the old
+   build.
+4. Sync the Pluggy accounts. A Pluggy account of type `CREDIT` becomes a card
+   account on its first sync; the closing and due days come from the bank. A
+   card that still says "Set the closing and due days" needs them in Card
+   settings (Mercado Pago did not report them in the 2026-10-14 export:
+   closes on 5, due on 10).
+   An existing account that is a card but not linked to Pluggy is converted
+   from the account menu, "Turn into a credit card".
+5. Check each card's bills against the bank app: closed bills' totals and
+   statuses, the open bill, projected installments. A difference from the bank
+   is shown on the bill when Pluggy sent its total.
+6. Check the uncategorized bill payments in checking accounts: each should now
+   be a transfer to its card, and its "Pagar fatura" schedule marked paid.
+
+Undo: redeploy the previous commit of both services and restore the backup
+from step 1. A budget that ran the new migration does not open on the
+previous build (it reports out-of-sync migrations), so the backup is the way
+back.
