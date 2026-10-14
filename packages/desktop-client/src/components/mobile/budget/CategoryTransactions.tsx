@@ -124,6 +124,6 @@ function TransactionListWithPreviews({
 function getCategoryMonthFilter(category: CategoryEntity, month: string) {
   return {
     category: category.id,
-    date: { $transform: '$month', $eq: month },
+    budget_date: { $transform: '$month', $eq: month },
   };
 }

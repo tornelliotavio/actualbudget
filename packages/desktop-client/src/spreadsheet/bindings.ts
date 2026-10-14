@@ -112,7 +112,7 @@ export function categoryBalance(
     query: q('transactions')
       .filter({
         category: categoryId,
-        date: { $transform: '$month', $eq: month },
+        budget_date: { $transform: '$month', $eq: month },
       })
       .options({ splits: 'inline' })
       .calculate({ $sum: '$amount' }),
@@ -128,7 +128,7 @@ export function categoryBalanceCleared(
     query: q('transactions')
       .filter({
         category: categoryId,
-        date: { $transform: '$month', $eq: month },
+        budget_date: { $transform: '$month', $eq: month },
         cleared: true,
       })
       .options({ splits: 'inline' })
@@ -145,7 +145,7 @@ export function categoryBalanceUncleared(
     query: q('transactions')
       .filter({
         category: categoryId,
-        date: { $transform: '$month', $eq: month },
+        budget_date: { $transform: '$month', $eq: month },
         cleared: false,
       })
       .options({ splits: 'inline' })
