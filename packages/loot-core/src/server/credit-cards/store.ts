@@ -15,8 +15,13 @@ export type CardAccountState = {
   profile: CardProfileEntity | null;
   bills: CardBillEntity[];
   purchases: CardPurchaseEntity[];
-  /** Alive transactions of the account, split parents excluded. */
+  /**
+   * Alive transactions of the account as the bank sees them: a split
+   * transaction is its parent, whose amount is the sum of its parts.
+   */
   transactions: TransactionEntity[];
+  /** Parts of split transactions; they follow their parent's bill. */
+  splitChildren: TransactionEntity[];
   /** Projected rows that were deleted, alive or not in storage anymore. */
   deletedProjectedIds: Set<string>;
 };
@@ -38,35 +43,47 @@ export async function loadCardAccountState(
     return null;
   }
 
-  const [profiles, bills, purchases, transactions, deleted, suppressed] =
-    await Promise.all([
-      aqlQuery(q('card_profiles').filter({ id: accountId }).select('*')),
-      aqlQuery(q('card_bills').filter({ account: accountId }).select('*')),
-      aqlQuery(q('card_purchases').filter({ account: accountId }).select('*')),
-      aqlQuery(
-        q('transactions')
-          .filter({ account: accountId })
-          .options({ splits: 'inline' })
-          .select('*'),
-      ),
-      db.all<{ id: string }>(
-        'SELECT id FROM transactions WHERE acct = ? AND projected = 1 AND tombstone = 1',
-        [accountId],
-      ),
-      db.all<{ imported_id: string }>(
-        "SELECT imported_id FROM bank_sync_suppressions WHERE account = ? AND reason = 'projected-deleted' AND tombstone = 0",
-        [accountId],
-      ),
-    ]);
+  const [
+    profiles,
+    bills,
+    purchases,
+    transactions,
+    splitChildren,
+    deleted,
+    suppressed,
+  ] = await Promise.all([
+    aqlQuery(q('card_profiles').filter({ id: accountId }).select('*')),
+    aqlQuery(q('card_bills').filter({ account: accountId }).select('*')),
+    aqlQuery(q('card_purchases').filter({ account: accountId }).select('*')),
+    aqlQuery(
+      q('transactions')
+        .filter({ account: accountId })
+        .options({ splits: 'none' })
+        .select('*'),
+    ),
+    aqlQuery(
+      q('transactions')
+        .filter({ account: accountId, is_child: true })
+        .options({ splits: 'inline' })
+        .select('*'),
+    ),
+    db.all<{ id: string }>(
+      'SELECT id FROM transactions WHERE acct = ? AND projected = 1 AND tombstone = 1',
+      [accountId],
+    ),
+    db.all<{ imported_id: string }>(
+      "SELECT imported_id FROM bank_sync_suppressions WHERE account = ? AND reason = 'projected-deleted' AND tombstone = 0",
+      [accountId],
+    ),
+  ]);
 
   return {
     account,
     profile: (profiles.data[0] as CardProfileEntity | undefined) ?? null,
     bills: bills.data as CardBillEntity[],
     purchases: purchases.data as CardPurchaseEntity[],
-    transactions: (transactions.data as TransactionEntity[]).filter(
-      transaction => !transaction.is_parent,
-    ),
+    transactions: transactions.data as TransactionEntity[],
+    splitChildren: splitChildren.data as TransactionEntity[],
     deletedProjectedIds: new Set([
       ...deleted.map(row => row.id),
       ...suppressed.map(row => row.imported_id),

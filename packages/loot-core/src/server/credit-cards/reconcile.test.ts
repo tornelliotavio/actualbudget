@@ -421,4 +421,65 @@ describe('reconcileCardAccount', () => {
     });
     expect(await projected()).toBe(2);
   });
+
+  it('keeps a split installment on its bill and its parts budgeted with it', async () => {
+    const accountId = await createCard();
+    await addTransaction({
+      id: 'first',
+      account: accountId,
+      date: '2026-10-10',
+      amount: -10000,
+      notes: 'LOJA X',
+      imported_id: 'pluggy-1',
+      raw_synced_data: pluggyRaw({
+        description: 'LOJA X',
+        'creditCardMetadata.installmentNumber': 1,
+        'creditCardMetadata.totalInstallments': 3,
+      }),
+    });
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+
+    await runMutator(async () => {
+      await db.updateTransaction({ id: 'first', is_parent: true });
+      for (const [id, amount] of [
+        ['part-a', -6000],
+        ['part-b', -4000],
+      ] as const) {
+        await db.insertTransaction({
+          id,
+          account: accountId,
+          date: '2026-10-10',
+          amount,
+          parent_id: 'first',
+          is_child: true,
+          cleared: true,
+        });
+      }
+    });
+    await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+
+    const rows = await db.all<{
+      id: string;
+      card_bill: string | null;
+      card_kind: string | null;
+      budget_date: number | null;
+      projected: number;
+    }>(
+      `SELECT id, card_bill, card_kind, budget_date, projected FROM transactions
+       WHERE acct = ? AND tombstone = 0 ORDER BY id`,
+      [accountId],
+    );
+    expect(rows.filter(row => row.projected === 1)).toHaveLength(2);
+    expect(
+      rows
+        .filter(row => !row.projected)
+        .map(row => [row.id, row.card_bill, row.card_kind, row.budget_date]),
+    ).toEqual([
+      ['first', `${accountId}:2026-11`, 'installment', 20261112],
+      ['part-a', `${accountId}:2026-11`, 'installment', 20261112],
+      ['part-b', `${accountId}:2026-11`, 'installment', 20261112],
+    ]);
+    const [bill] = (await getCardBills(accountId, { today: TODAY })).bills;
+    expect(bill.charges).toBe(10000);
+  });
 });

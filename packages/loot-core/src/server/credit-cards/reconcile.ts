@@ -179,6 +179,16 @@ export async function reconcileCardAccount(
     state.transactions.map(transaction => [transaction.id, transaction]),
   );
 
+  const childrenByParent = new Map<string, TransactionEntity[]>();
+  for (const child of state.splitChildren) {
+    if (child.parent_id) {
+      childrenByParent.set(child.parent_id, [
+        ...(childrenByParent.get(child.parent_id) ?? []),
+        child,
+      ]);
+    }
+  }
+
   await batchMessages(async () => {
     await writePurchases(
       accountId,
@@ -210,6 +220,24 @@ export async function reconcileCardAccount(
       const changes = changedFields(current, desired);
       if (Object.keys(changes).length > 0) {
         await db.updateTransaction({ id: entry.id, ...changes });
+      }
+
+      // The parts of a split are on their parent's bill and budgeted with it.
+      for (const child of childrenByParent.get(entry.id) ?? []) {
+        const childDesired: Partial<ReturnType<typeof entryColumns>> = {
+          ...entryColumns(accountId, entry),
+          date: desired.date ?? current.date,
+        };
+        if (
+          childDesired.budget_date == null &&
+          child.budget_date === child.date
+        ) {
+          delete childDesired.budget_date;
+        }
+        const childChanges = changedFields(child, childDesired);
+        if (Object.keys(childChanges).length > 0) {
+          await db.updateTransaction({ id: child.id, ...childChanges });
+        }
       }
     }
 
