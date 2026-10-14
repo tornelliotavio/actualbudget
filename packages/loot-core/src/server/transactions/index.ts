@@ -87,6 +87,10 @@ export async function batchUpdateTransactions({
     if (added) {
       addedIds = await Promise.all(
         added.map(async t => {
+          // Card reconciliation owns these. A copied card transaction is
+          // neither projected nor budgeted until its card says so.
+          delete t.budget_date;
+          delete t.projected;
           // Offbudget account transactions and parent transactions should not have categories.
           const account = accounts.find(acct => acct.id === t.account);
           if (t.is_parent || account?.offbudget === 1) {
@@ -112,6 +116,9 @@ export async function batchUpdateTransactions({
     if (updated) {
       await Promise.all(
         updated.map(async t => {
+          // Reads return a missing budget date as the transaction's date;
+          // writing that back would pin it. Card reconciliation sets it.
+          delete t.budget_date;
           if (t.account) {
             // Moving transactions off budget should always clear the
             // category. Parent transactions should not have categories.

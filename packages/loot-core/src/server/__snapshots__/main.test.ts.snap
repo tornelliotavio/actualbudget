@@ -79,15 +79,7 @@ exports[`Accounts > Transfers are properly updated 2`] = `
 "- First value
 + Second value
 
-@@ -1,19 +1,19 @@
-  Array [
-    Object {
-      "acct": "one",
-      "amount": 5000,
-      "bank_sync_missing_since": null,
--     "budget_date": null,
-+     "budget_date": 20170101,
-      "card_bill": null,
+@@ -8,12 +8,12 @@
       "card_bill_source": null,
       "card_kind": null,
       "card_purchase": null,
