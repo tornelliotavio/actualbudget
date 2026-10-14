@@ -5,6 +5,7 @@ import type { SyncResponseWithErrors } from '@actual-app/core/server/accounts/ap
 import type {
   AccountEntity,
   AccountGroupEntity,
+  AccountKind,
   CategoryEntity,
   SyncServerAkahuAccount,
   SyncServerEnableBankingAccount,
@@ -60,6 +61,12 @@ type CreateAccountPayload = {
   name: string;
   balance: number;
   offBudget: boolean;
+  kind?: AccountKind;
+  card?: {
+    closingDay: number | null;
+    dueDay: number | null;
+    creditLimit: number | null;
+  };
 };
 
 export function useCreateAccountMutation() {
@@ -68,11 +75,19 @@ export function useCreateAccountMutation() {
   const { t } = useTranslation();
 
   return useMutation({
-    mutationFn: async ({ name, balance, offBudget }: CreateAccountPayload) => {
+    mutationFn: async ({
+      name,
+      balance,
+      offBudget,
+      kind,
+      card,
+    }: CreateAccountPayload) => {
       const id = await send('account-create', {
         name,
         balance,
         offBudget,
+        kind,
+        card,
       });
       return id;
     },

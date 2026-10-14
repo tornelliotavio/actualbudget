@@ -16,6 +16,7 @@ function makeLocalAccount(
 ): AccountEntity {
   return {
     name: overrides.id,
+    kind: 'standard',
     offbudget: 0,
     closed: 0,
     sort_order: 0,

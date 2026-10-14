@@ -15,6 +15,7 @@ import type { RemoteFile } from './cloud-storage';
 import * as models from './models';
 
 export type APIAccountEntity = Pick<AccountEntity, 'id' | 'name'> & {
+  kind?: AccountEntity['kind'];
   offbudget?: boolean;
   closed?: boolean;
   balance_current?: number | null;
@@ -28,6 +29,7 @@ export const accountModel = {
     return {
       id: account.id,
       name: account.name,
+      kind: account.kind,
       offbudget: account.offbudget ? true : false,
       closed: account.closed ? true : false,
       balance_current: account.balance_current ?? null,

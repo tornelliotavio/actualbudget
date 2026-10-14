@@ -5,6 +5,8 @@ import * as asyncStorage from '#platform/server/asyncStorage';
 import * as connection from '#platform/server/connection';
 import { logger } from '#platform/server/log';
 import { createApp } from '#server/app';
+import { makeCreditCardAccount } from '#server/credit-cards/profiles';
+import type { CardSettingsInput } from '#server/credit-cards/profiles';
 import * as db from '#server/db';
 import {
   APIError,
@@ -27,6 +29,7 @@ import type { ImportTransactionsOpts } from '#types/api-handlers';
 import type {
   AccountEntity,
   AccountGroupEntity,
+  AccountKind,
   BankSyncProviderStatus,
   BankSyncStatus,
   CategoryEntity,
@@ -117,6 +120,7 @@ async function getAccounts(): Promise<AccountEntity[]> {
       ({
         id: dbAccount.id,
         name: dbAccount.name,
+        kind: dbAccount.kind ?? 'standard',
         offbudget: dbAccount.offbudget,
         closed: dbAccount.closed,
         sort_order: dbAccount.sort_order,
@@ -373,6 +377,10 @@ async function linkPluggyAiAccount({
     });
   }
 
+  if (externalAccount.kind === 'credit_card') {
+    await makeCreditCardAccount(id);
+  }
+
   const syncRes = await bankSync.syncAccount(
     undefined,
     undefined,
@@ -558,17 +566,25 @@ async function createAccount({
   balance = 0,
   offBudget = false,
   closed = false,
+  kind = 'standard',
+  card,
 }: {
   name: string;
   balance?: number | undefined;
   offBudget?: boolean | undefined;
   closed?: boolean | undefined;
+  kind?: AccountKind | undefined;
+  card?: CardSettingsInput | undefined;
 }) {
   const id: AccountEntity['id'] = await db.insertAccount({
     name,
     offbudget: offBudget ? 1 : 0,
     closed: closed ? 1 : 0,
   });
+
+  if (kind === 'credit_card') {
+    await makeCreditCardAccount(id, card);
+  }
 
   await db.insertPayee({
     name: '',

@@ -9,10 +9,12 @@ import { FormError } from '@actual-app/components/form-error';
 import { InitialFocus } from '@actual-app/components/initial-focus';
 import { InlineField } from '@actual-app/components/inline-field';
 import { Input } from '@actual-app/components/input';
+import { Select } from '@actual-app/components/select';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import { toRelaxedNumber } from '@actual-app/core/shared/util';
+import { amountToInteger, toRelaxedNumber } from '@actual-app/core/shared/util';
+import type { AccountKind } from '@actual-app/core/types/models';
 
 import { useCreateAccountMutation } from '#accounts';
 import { Link } from '#components/common/Link';
@@ -40,11 +42,24 @@ export function CreateLocalAccountModal() {
   const [name, setName] = useState('');
   const [offbudget, setOffbudget] = useState(false);
   const [balance, setBalance] = useState('0');
+  const [kind, setKind] = useState<AccountKind>('standard');
+  const [closingDay, setClosingDay] = useState('');
+  const [dueDay, setDueDay] = useState('');
+  const [creditLimit, setCreditLimit] = useState('');
+  const isCard = kind === 'credit_card';
 
   const [nameError, setNameError] = useState(null);
   const [balanceError, setBalanceError] = useState(false);
 
   const validateBalance = balance => !isNaN(parseFloat(balance));
+  const parseDay = (value: string) => {
+    const day = parseInt(value, 10);
+    return Number.isInteger(day) && day >= 1 && day <= 31 ? day : null;
+  };
+  const daysError =
+    isCard &&
+    ((closingDay.trim() !== '' && parseDay(closingDay) == null) ||
+      (dueDay.trim() !== '' && parseDay(dueDay) == null));
 
   const validateAndSetName = (name: string) => {
     const nameError = validateAccountName(name, '', accounts);
@@ -66,12 +81,25 @@ export function CreateLocalAccountModal() {
     const balanceError = !validateBalance(balance);
     setBalanceError(balanceError);
 
-    if (!nameError && !balanceError) {
+    if (!nameError && !balanceError && !daysError) {
+      const amount = toRelaxedNumber(balance);
       createAccount.mutate(
         {
           name,
-          balance: toRelaxedNumber(balance),
+          // A card's balance is entered as the amount owed.
+          balance: isCard ? -Math.abs(amount) : amount,
           offBudget: offbudget,
+          kind,
+          card: isCard
+            ? {
+                closingDay: parseDay(closingDay),
+                dueDay: parseDay(dueDay),
+                creditLimit:
+                  creditLimit.trim() === ''
+                    ? null
+                    : amountToInteger(toRelaxedNumber(creditLimit)),
+              }
+            : undefined,
         },
         {
           onSuccess: id => {
@@ -141,6 +169,70 @@ export function CreateLocalAccountModal() {
                 </FormError>
               )}
 
+              <InlineField label={t('Type')} width="100%">
+                <Select<AccountKind>
+                  value={kind}
+                  onChange={setKind}
+                  options={[
+                    ['standard', t('Account')],
+                    ['credit_card', t('Credit card')],
+                  ]}
+                  style={{ flex: 1 }}
+                />
+              </InlineField>
+
+              {isCard && (
+                <>
+                  <InlineField label={t('Closes on')} width="100%">
+                    <Input
+                      name="closingDay"
+                      inputMode="numeric"
+                      placeholder={t('Day of the month')}
+                      value={closingDay}
+                      onChangeValue={setClosingDay}
+                      style={{ flex: 1 }}
+                    />
+                  </InlineField>
+                  <InlineField label={t('Due on')} width="100%">
+                    <Input
+                      name="dueDay"
+                      inputMode="numeric"
+                      placeholder={t('Day of the month')}
+                      value={dueDay}
+                      onChangeValue={setDueDay}
+                      style={{ flex: 1 }}
+                    />
+                  </InlineField>
+                  <InlineField label={t('Limit')} width="100%">
+                    <Input
+                      name="creditLimit"
+                      inputMode="decimal"
+                      value={creditLimit}
+                      onChangeValue={setCreditLimit}
+                      style={{ flex: 1 }}
+                    />
+                  </InlineField>
+                  {daysError && (
+                    <FormError style={{ marginLeft: 75 }}>
+                      <Trans>Days must be numbers from 1 to 31</Trans>
+                    </FormError>
+                  )}
+                  <Text
+                    style={{
+                      color: theme.pageTextLight,
+                      fontSize: '0.8em',
+                      marginLeft: 75,
+                      marginBottom: 10,
+                    }}
+                  >
+                    <Trans>
+                      Leave the days empty when the card is linked to a bank:
+                      they are read from the bank.
+                    </Trans>
+                  </Text>
+                </>
+              )}
+
               <View
                 style={{
                   width: '100%',
@@ -202,7 +294,10 @@ export function CreateLocalAccountModal() {
                 </View>
               </View>
 
-              <InlineField label={t('Balance')} width="100%">
+              <InlineField
+                label={isCard ? t('Amount owed') : t('Balance')}
+                width="100%"
+              >
                 <Input
                   name="balance"
                   inputMode="decimal"

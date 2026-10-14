@@ -18,6 +18,7 @@ export function generateAccount(
   const offlineAccount: AccountEntity = {
     id: uuidv4(),
     name,
+    kind: 'standard',
     offbudget: offbudget ? 1 : 0,
     sort_order: 0,
     last_reconciled: null,

@@ -1,3 +1,5 @@
+import type { AccountKind } from './account';
+
 export type PluggyAiOrganization = {
   name: string;
   domain: string;
@@ -11,6 +13,7 @@ export type PluggyAiAccount = {
 
 export type SyncServerPluggyAiAccount = {
   balance: number;
+  kind?: AccountKind;
   account_id: string;
   institution?: string;
   orgDomain?: string | null;

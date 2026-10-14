@@ -513,6 +513,10 @@ export function useBuiltInBankSyncProviders({
           institution: oldAccount.name,
           orgDomain: null,
           orgId: oldAccount.id,
+          kind:
+            oldAccount.type === 'CREDIT'
+              ? ('credit_card' as const)
+              : ('standard' as const),
           balance:
             oldAccount.type === 'BANK'
               ? oldAccount.bankData.automaticallyInvestedBalance +

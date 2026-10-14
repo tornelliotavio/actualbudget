@@ -1,9 +1,12 @@
 import type { AccountGroupEntity } from './account-group';
 import type { BankSyncProviders } from './bank-sync';
 
+export type AccountKind = 'standard' | 'credit_card';
+
 export type AccountEntity = {
   id: string;
   name: string;
+  kind: AccountKind;
   offbudget: 0 | 1;
   closed: 0 | 1;
   sort_order: number;

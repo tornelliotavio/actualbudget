@@ -37,6 +37,7 @@ export type DbAccount = {
     | 'not-configured'
     | null;
   account_group_id?: DbAccountGroup['id'] | null;
+  kind?: 'standard' | 'credit_card' | null;
 };
 
 export type DbAccountGroup = {
