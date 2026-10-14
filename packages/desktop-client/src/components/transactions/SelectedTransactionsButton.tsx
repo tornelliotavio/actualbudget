@@ -3,7 +3,9 @@ import { useHotkeys } from 'react-hotkeys-hook';
 import { useTranslation } from 'react-i18next';
 
 import { Menu } from '@actual-app/components/menu';
+import { send } from '@actual-app/core/platform/client/connection';
 import { validForMerge } from '@actual-app/core/shared/merge';
+import { addMonths } from '@actual-app/core/shared/months';
 import { q } from '@actual-app/core/shared/query';
 import {
   extractScheduleConds,
@@ -101,6 +103,47 @@ export function SelectedTransactionsButton({
 
     return transactions.some(tx => tx && tx.is_child);
   }, [selectedIds, getTransaction]);
+
+  // Real transactions of a card account; their bill can be chosen by hand.
+  const cardTransactions = useMemo(
+    () =>
+      selectedIds
+        .map(id => getTransaction(id))
+        .filter(
+          (transaction): transaction is TransactionEntity =>
+            !!transaction?.card_bill && !transaction.projected,
+        ),
+    [selectedIds, getTransaction],
+  );
+  const isCardSelection =
+    cardTransactions.length > 0 &&
+    cardTransactions.length === selectedIds.length;
+  const hasPinnedBill = cardTransactions.some(
+    transaction => transaction.card_bill_source === 'user',
+  );
+  const purchaseIds = [
+    ...new Set(
+      cardTransactions
+        .map(transaction => transaction.card_purchase)
+        .filter((id): id is string => !!id),
+    ),
+  ];
+
+  const onMoveToBill = async (months: number | null) => {
+    for (const transaction of cardTransactions) {
+      const billMonth = transaction.card_bill!.slice(-7);
+      await send('credit-card-transaction-bill', {
+        id: transaction.id,
+        referenceMonth: months == null ? null : addMonths(billMonth, months),
+      });
+    }
+  };
+
+  const onSetPurchaseStatus = async (status: 'active' | 'cancelled') => {
+    for (const id of purchaseIds) {
+      await send('credit-card-purchase-status', { id, status });
+    }
+  };
 
   const linked = useMemo(() => {
     return (
@@ -398,6 +441,44 @@ export function SelectedTransactionsButton({
                     } as const,
                   ]
                 : []),
+              ...(isCardSelection
+                ? [
+                    Menu.line,
+                    {
+                      type: Menu.label,
+                      name: t('Card bill'),
+                      text: '',
+                    } as const,
+                    {
+                      name: 'card-bill-previous',
+                      text: t('Move to previous bill'),
+                    } as const,
+                    {
+                      name: 'card-bill-next',
+                      text: t('Move to next bill'),
+                    } as const,
+                    ...(hasPinnedBill
+                      ? [
+                          {
+                            name: 'card-bill-auto',
+                            text: t('Let the bill be set automatically'),
+                          } as const,
+                        ]
+                      : []),
+                    ...(purchaseIds.length > 0
+                      ? [
+                          {
+                            name: 'card-purchase-cancel',
+                            text: t('Stop projecting installments'),
+                          } as const,
+                          {
+                            name: 'card-purchase-resume',
+                            text: t('Project installments again'),
+                          } as const,
+                        ]
+                      : []),
+                  ]
+                : []),
               Menu.line,
               { type: Menu.label, name: t('Edit field'), text: '' } as const,
               { name: 'date', text: t('Date'), key: 'E' } as const,
@@ -452,6 +533,21 @@ export function SelectedTransactionsButton({
             break;
           case 'set-transfer':
             onSetTransfer(selectedIds);
+            break;
+          case 'card-bill-previous':
+            void onMoveToBill(-1);
+            break;
+          case 'card-bill-next':
+            void onMoveToBill(1);
+            break;
+          case 'card-bill-auto':
+            void onMoveToBill(null);
+            break;
+          case 'card-purchase-cancel':
+            void onSetPurchaseStatus('cancelled');
+            break;
+          case 'card-purchase-resume':
+            void onSetPurchaseStatus('active');
             break;
           default:
             // @ts-expect-error fix me
