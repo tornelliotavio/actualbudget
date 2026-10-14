@@ -469,4 +469,30 @@ describe('credit card bank sync', () => {
       ),
     ).toEqual({ transferred_id: null, category: rent });
   });
+
+  it('never removes a posted charge the user marked uncleared', async () => {
+    const posted = pluggyTransaction({
+      id: 'posted',
+      date: '2026-10-10',
+      amount: -50,
+      description: 'POSTO COPERCANA',
+    });
+    const other = pluggyTransaction({
+      id: 'netflix',
+      date: '2026-10-12',
+      amount: -20.9,
+      description: 'NETFLIX.COM',
+    });
+    respond(CARD, [posted, other]);
+    await syncCard();
+    const row = (await cardRows()).find(r => r.financial_id === 'posted')!;
+    await db.updateTransaction({ id: row.id, cleared: false });
+
+    respond(CARD, [other]);
+    await syncCard();
+    setToday('2026-10-18');
+    await syncCard();
+
+    expect((await cardRows()).map(r => r.financial_id)).toContain('posted');
+  });
 });

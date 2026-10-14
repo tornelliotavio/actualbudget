@@ -3,6 +3,7 @@ import { addDays, currentDay } from '#shared/months';
 import type { AccountEntity } from '#types/models';
 
 import { linkCardPayments } from './payment-links';
+import { parseRawSyncedData } from './provider-facts';
 import { reconcileCardAccount } from './reconcile';
 import { applyCardSnapshot } from './snapshot';
 import type { ProviderCardSnapshot } from './snapshot';
@@ -41,10 +42,16 @@ export async function prepareCardImport(
   return account?.kind === 'credit_card';
 }
 
+function wasPendingAtTheBank(rawSyncedData: string | null) {
+  const raw = parseRawSyncedData(rawSyncedData);
+  return raw != null && (raw.booked === false || raw.status === 'PENDING');
+}
+
 /**
  * A pending card charge the bank stopped returning was cancelled (an
  * authorization that never posted) or replaced under a new id. It is
- * removed once it has been missing for a few days; posted charges are
+ * removed once it has been missing for a few days. Only charges the bank
+ * itself last sent as pending qualify; posted charges and transfers are
  * never removed.
  */
 async function removeVanishedPending(
@@ -56,17 +63,22 @@ async function removeVanishedPending(
   if (downloadedIds.size === 0) {
     return;
   }
-  const rows = await db.all<{
-    id: string;
-    financial_id: string;
-    bank_sync_missing_since: number | null;
-  }>(
-    `SELECT id, financial_id, bank_sync_missing_since FROM transactions
-     WHERE acct = ? AND tombstone = 0 AND cleared = 0
-       AND IFNULL(projected, 0) = 0 AND financial_id IS NOT NULL
-       AND date >= ?`,
-    [accountId, db.toDateRepr(windowStart)],
-  );
+  const rows = (
+    await db.all<{
+      id: string;
+      financial_id: string;
+      bank_sync_missing_since: number | null;
+      raw_synced_data: string | null;
+    }>(
+      `SELECT id, financial_id, bank_sync_missing_since, raw_synced_data
+       FROM transactions
+       WHERE acct = ? AND tombstone = 0 AND isParent = 0 AND isChild = 0
+         AND transferred_id IS NULL
+         AND IFNULL(projected, 0) = 0 AND financial_id IS NOT NULL
+         AND date >= ?`,
+      [accountId, db.toDateRepr(windowStart)],
+    )
+  ).filter(row => wasPendingAtTheBank(row.raw_synced_data));
   const graceLimit = db.toDateRepr(addDays(today, -PENDING_GRACE_DAYS));
   for (const row of rows) {
     if (downloadedIds.has(row.financial_id)) {
