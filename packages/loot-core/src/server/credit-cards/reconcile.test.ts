@@ -411,13 +411,13 @@ describe('reconcileCardAccount', () => {
     const [{ card_purchase: purchaseId }] = await cardRows(accountId);
     await app.handlers['credit-card-purchase-status']({
       id: purchaseId!,
-      status: 'cancelled',
+      status: 'dismissed',
     });
     expect(await projected()).toBe(0);
 
     await app.handlers['credit-card-purchase-status']({
       id: purchaseId!,
-      status: 'active',
+      status: 'kept',
     });
     expect(await projected()).toBe(2);
   });

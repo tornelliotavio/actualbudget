@@ -81,7 +81,7 @@ Migration `1792008316315_native_credit_cards.sql`.
 | `transactions.bank_sync_missing_since` | Pending card charges the bank stopped returning; removed after three days.                                                                                                        |
 | `card_profiles`                        | One per card (id = account id): closing and due days from the bank and the user, closing-day rule, limit, payment descriptions, `adjustments_from`.                               |
 | `card_bills`                           | One per bill the bank or the user described: dates, total, minimum, finance charges and payments from Pluggy; dates and total set by the user.                                    |
-| `card_purchases`                       | Installment purchases and their status (active, cancelled, dismissed).                                                                                                            |
+| `card_purchases`                       | Installment purchases and their status: active, kept (resumed by the user; refunds no longer cancel it), cancelled (by a refund), dismissed (stopped by the user).                |
 | `bank_sync_suppressions`               | Imported ids bank sync must not insert again.                                                                                                                                     |
 
 Every write goes through CRDT. Reconciliation is idempotent: a second run

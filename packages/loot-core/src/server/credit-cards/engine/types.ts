@@ -100,7 +100,16 @@ export type StoredCardFields = {
   installmentCount: number | null;
 };
 
-export type PurchaseStatus = 'active' | 'cancelled' | 'dismissed';
+/**
+ * `active`: projected, and a refund of it cancels it. `kept`: the user chose
+ * to keep projecting it, refunds included. `cancelled`: a refund ended it.
+ * `dismissed`: the user stopped projecting it.
+ */
+export type PurchaseStatus = 'active' | 'kept' | 'cancelled' | 'dismissed';
+
+export function isProjecting(status: PurchaseStatus) {
+  return status === 'active' || status === 'kept';
+}
 
 export type Purchase = {
   id: string;

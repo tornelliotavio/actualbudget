@@ -22,6 +22,7 @@ import type {
   MonthString,
   Purchase,
 } from './types';
+import { isProjecting } from './types';
 
 export type PlanInput = {
   accountId: string;
@@ -434,7 +435,7 @@ function projectPurchases(
 
   for (const purchase of purchases.values()) {
     const members = membersByPurchase.get(purchase.id) ?? [];
-    if (purchase.status !== 'active' || members.length === 0) {
+    if (!isProjecting(purchase.status) || members.length === 0) {
       continue;
     }
     const byNumber = new Map(

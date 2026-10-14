@@ -68,7 +68,8 @@ export type CardBillEntity = {
   tombstone?: boolean;
 };
 
-export type CardPurchaseStatus = 'active' | 'cancelled' | 'dismissed';
+/** See `PurchaseStatus` in the credit card engine. */
+export type CardPurchaseStatus = 'active' | 'kept' | 'cancelled' | 'dismissed';
 
 export type CardPurchaseEntity = {
   id: string;

@@ -2,6 +2,7 @@ import { v5 as uuidv5 } from 'uuid';
 
 import { monthsBetween } from './bill-calendar';
 import type { DateString, MonthString, Purchase } from './types';
+import { isProjecting } from './types';
 
 const PURCHASE_NAMESPACE = 'b8f0b1f4-5b8e-4b8f-9a77-0d6c0a3c2e51';
 
@@ -160,8 +161,8 @@ export function assignPurchases(
     };
 
     const byDescription = [...purchases.values()].filter(
+      // A purchase whose projections stopped still owns its installments.
       purchase =>
-        purchase.status === 'active' &&
         purchase.stem === candidate.stem &&
         purchase.installmentCount === candidate.count &&
         sameCard(purchase.cardLast4, candidate.cardLast4) &&
@@ -187,7 +188,7 @@ export function assignPurchases(
           slot.count === candidate.count &&
           slot.billMonth === candidate.billMonth &&
           closeAmount(slot.amount, candidate.amount, candidate.count) &&
-          purchases.get(slot.purchaseId)?.status === 'active' &&
+          isProjecting(purchases.get(slot.purchaseId)?.status ?? 'dismissed') &&
           slotFree(purchases.get(slot.purchaseId)!),
       );
       const ids = [...new Set(bySlot.map(slot => slot.purchaseId))];
@@ -267,7 +268,7 @@ function mergeDuplicatePurchases(
 ): Map<string, string> {
   const groups = new Map<string, Purchase[]>();
   for (const purchase of purchases.values()) {
-    if (purchase.status !== 'active') {
+    if (!isProjecting(purchase.status)) {
       continue;
     }
     const key = [

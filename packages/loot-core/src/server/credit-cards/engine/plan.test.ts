@@ -331,6 +331,53 @@ describe('planCardAccount', () => {
     });
   });
 
+  it('keeps projecting a purchase the user kept despite a refund', () => {
+    const first = plan([sixTimes({ date: '2026-08-10' })]);
+    const kept = { ...first.purchases[0], status: 'kept' as const };
+    const result = plan(
+      [
+        sixTimes({ date: '2026-08-10', stored: { purchaseId: kept.id } }),
+        cardEntry({
+          id: 'estorno',
+          importedId: 'pluggy-3',
+          date: '2026-10-01',
+          amount: 50000,
+          description: 'LOJA X',
+        }),
+      ],
+      { purchases: [kept] },
+    );
+    expect(result.purchases[0].status).toBe('kept');
+    expect(result.projected).toHaveLength(first.projected.length);
+  });
+
+  it('gives a stopped purchase its next installment without projecting', () => {
+    const first = plan([sixTimes({ date: '2026-08-10' })]);
+    const stopped = { ...first.purchases[0], status: 'dismissed' as const };
+    const result = plan(
+      [
+        sixTimes({ date: '2026-08-10', stored: { purchaseId: stopped.id } }),
+        cardEntry({
+          id: 'loja-2',
+          importedId: 'pluggy-2',
+          date: '2026-09-10',
+          amount: -10000,
+          description: 'LOJA X',
+          provider: { installment: { number: 2, count: 6 } },
+        }),
+      ],
+      { purchases: [stopped] },
+    );
+    expect(result.purchases.map(purchase => purchase.status)).toEqual([
+      'dismissed',
+    ]);
+    expect(result.projected).toEqual([]);
+    expect(result.entries.map(entry => entry.purchaseId)).toEqual([
+      stopped.id,
+      stopped.id,
+    ]);
+  });
+
   it('attributes a payment to the bill that closed before it', () => {
     const result = plan([
       cardEntry({

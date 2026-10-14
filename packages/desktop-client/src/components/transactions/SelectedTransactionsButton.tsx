@@ -139,7 +139,7 @@ export function SelectedTransactionsButton({
     }
   };
 
-  const onSetPurchaseStatus = async (status: 'active' | 'cancelled') => {
+  const onSetPurchaseStatus = async (status: 'kept' | 'dismissed') => {
     for (const id of purchaseIds) {
       await send('credit-card-purchase-status', { id, status });
     }
@@ -544,10 +544,10 @@ export function SelectedTransactionsButton({
             void onMoveToBill(null);
             break;
           case 'card-purchase-cancel':
-            void onSetPurchaseStatus('cancelled');
+            void onSetPurchaseStatus('dismissed');
             break;
           case 'card-purchase-resume':
-            void onSetPurchaseStatus('active');
+            void onSetPurchaseStatus('kept');
             break;
           default:
             // @ts-expect-error fix me
