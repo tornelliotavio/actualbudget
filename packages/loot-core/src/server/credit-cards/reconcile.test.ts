@@ -2,6 +2,7 @@ import { app as accountsApp } from '#server/accounts/app';
 import * as db from '#server/db';
 import { loadMappings } from '#server/db/mappings';
 import { runMutator } from '#server/mutators';
+import { addSyncListener } from '#server/sync';
 import { app as transactionsApp } from '#server/transactions/app';
 import type { TransactionEntity } from '#types/models';
 
@@ -156,18 +157,18 @@ describe('reconcileCardAccount', () => {
     });
     await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
     const before = await db.all('SELECT * FROM transactions ORDER BY id');
-    const messagesBefore = await db.first<{ count: number }>(
-      'SELECT count(*) AS count FROM messages_crdt',
-    );
+    const written: string[] = [];
+    const stopListening = addSyncListener((_, newValues) => {
+      written.push(...newValues.keys());
+    });
 
     await runMutator(() => reconcileCardAccount(accountId, { today: TODAY }));
+    stopListening();
 
     expect(await db.all('SELECT * FROM transactions ORDER BY id')).toEqual(
       before,
     );
-    expect(
-      await db.first('SELECT count(*) AS count FROM messages_crdt'),
-    ).toEqual(messagesBefore);
+    expect(written).toEqual([]);
   });
 
   it('does not recreate a projected installment the user deleted', async () => {

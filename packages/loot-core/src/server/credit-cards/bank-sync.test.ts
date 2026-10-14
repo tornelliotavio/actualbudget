@@ -3,6 +3,7 @@ import * as asyncStorage from '#platform/server/asyncStorage';
 import { syncAccount } from '#server/accounts/sync';
 import * as db from '#server/db';
 import { loadMappings } from '#server/db/mappings';
+import { addSyncListener } from '#server/sync';
 import { handlers } from '#server/tests/mockSyncServer';
 import { loadRules } from '#server/transactions/transaction-rules';
 import * as monthUtils from '#shared/months';
@@ -250,12 +251,28 @@ describe('credit card bank sync', () => {
         description: 'APPLE.COM/BILL         SAO PAULO     BRA',
         status: 'PENDING',
       }),
+      pluggyTransaction({
+        id: 'payment',
+        date: '2026-10-10',
+        amount: 948.25,
+        description: 'PAGAMENTO ON LINE',
+        operationType: 'PAGAMENTO_FATURA',
+      }),
     ]);
     await syncCard();
     const before = await db.all('SELECT * FROM transactions ORDER BY id');
     const billsBefore = await db.all('SELECT * FROM card_bills ORDER BY id');
+    const written = new Set<string>();
+    const stopListening = addSyncListener((_, newValues) => {
+      for (const table of newValues.keys()) {
+        written.add(table);
+      }
+    });
 
     await syncCard();
+    stopListening();
+    // Only the account's sync bookkeeping changes.
+    expect([...written]).toEqual(['accounts']);
 
     const after = await db.all('SELECT * FROM transactions ORDER BY id');
     expect(after).toEqual(before);

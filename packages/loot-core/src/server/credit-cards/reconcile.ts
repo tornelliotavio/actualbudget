@@ -202,6 +202,11 @@ export async function reconcileCardAccount(
       if (current.card_bill && entry.kind !== 'installment') {
         delete desired.date;
       }
+      // Reads give a missing budget date as the transaction's date, which is
+      // what no budget date means.
+      if (desired.budget_date == null && current.budget_date === current.date) {
+        delete desired.budget_date;
+      }
       const changes = changedFields(current, desired);
       if (Object.keys(changes).length > 0) {
         await db.updateTransaction({ id: entry.id, ...changes });
