@@ -48,7 +48,7 @@ export type BillOccurrence = {
   status: BillStatus;
 };
 
-/** A closed credit card bill (fatura), amounts in cents. */
+/** A credit card bill (fatura), amounts in cents. */
 export type CardBill = {
   dueDate: string;
   totalAmount: number;
@@ -169,23 +169,17 @@ function estimateAmount(
 }
 
 /**
- * Schedules whose payee is a transfer to a credit card synced through Pluggy,
- * mapped to that card's account id.
+ * Schedules whose payee is a transfer to a credit card account, mapped to
+ * that card's account id.
  */
 export function getCardAccountsBySchedule(
   schedules: readonly Pick<BillSchedule, 'id' | '_payee'>[],
   payees: readonly Pick<PayeeEntity, 'id' | 'transfer_acct'>[],
-  accounts: readonly Pick<
-    AccountEntity,
-    'id' | 'closed' | 'account_sync_source'
-  >[],
+  accounts: readonly Pick<AccountEntity, 'id' | 'closed' | 'kind'>[],
 ): Map<string, string> {
-  const pluggyAccounts = new Set(
+  const cardAccounts = new Set(
     accounts
-      .filter(
-        account =>
-          !account.closed && account.account_sync_source === 'pluggyai',
-      )
+      .filter(account => !account.closed && account.kind === 'credit_card')
       .map(account => account.id),
   );
   const transferAccounts = new Map(
@@ -197,7 +191,7 @@ export function getCardAccountsBySchedule(
     const account = schedule._payee
       ? transferAccounts.get(schedule._payee)
       : undefined;
-    if (account && pluggyAccounts.has(account)) {
+    if (account && cardAccounts.has(account)) {
       result.set(schedule.id, account);
     }
   }

@@ -23,20 +23,28 @@ import type {
   CardBill,
 } from './billOccurrences';
 
-const CARD_BILLS_STALE_MS = 10 * 60 * 1000;
+const CARD_BILLS_STALE_MS = 30 * 1000;
 
 /**
- * Closed bills per card account. A card whose bills can't be fetched (offline,
- * Pluggy down) is left out, so its schedule falls back to the estimate.
+ * Bills per card account, oldest first. A card without billing days is left
+ * out, so its schedule falls back to the estimate.
  */
 function useCardBills(accountIds: string[]) {
   return useAsyncQuery({
-    queryKey: ['pluggyai-bills', ...accountIds],
+    queryKey: ['credit-card-bills-by-account', ...accountIds],
     queryFn: async () => {
       const entries = await Promise.all(
-        accountIds.map(async id => {
-          const result = await send('pluggyai-bills', { id });
-          return Array.isArray(result) ? ([id, result] as const) : null;
+        accountIds.map(async accountId => {
+          const result = await send('credit-card-bills', { accountId });
+          if (result.status !== 'ok') {
+            return null;
+          }
+          const bills: CardBill[] = result.bills.map(bill => ({
+            dueDate: bill.effectiveDueDate,
+            totalAmount: bill.total,
+            paidAmount: bill.paid,
+          }));
+          return [accountId, bills] as const;
         }),
       );
       return new Map<string, CardBill[]>(
@@ -45,7 +53,6 @@ function useCardBills(accountIds: string[]) {
     },
     enabled: accountIds.length > 0,
     staleTime: CARD_BILLS_STALE_MS,
-    retry: false,
   });
 }
 

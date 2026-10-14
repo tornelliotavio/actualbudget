@@ -246,7 +246,7 @@ describe('getMonthBillOccurrences', () => {
 });
 
 describe('getCardAccountsBySchedule', () => {
-  it('finds schedules that pay a Pluggy-synced card by transfer', () => {
+  it('finds schedules that pay a card account by transfer', () => {
     const result = getCardAccountsBySchedule(
       [
         makeSchedule({ id: 'itau' }),
@@ -255,12 +255,12 @@ describe('getCardAccountsBySchedule', () => {
       ],
       [
         { id: 'itau-payee', transfer_acct: CARD },
-        { id: 'manual-payee', transfer_acct: 'manual-card' },
+        { id: 'manual-payee', transfer_acct: 'savings' },
         { id: 'rent-payee' },
       ],
       [
-        { id: CARD, closed: 0, account_sync_source: 'pluggyai' },
-        { id: 'manual-card', closed: 0, account_sync_source: null },
+        { id: CARD, closed: 0, kind: 'credit_card' },
+        { id: 'savings', closed: 0, kind: 'standard' },
       ],
     );
 
