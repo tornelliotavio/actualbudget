@@ -103,7 +103,7 @@ export async function updateCardSettings(
       | 'closing_day_user'
       | 'closing_offset_user'
       | 'due_day_user'
-      | 'closing_day_in_next_bill'
+      | 'closing_day_on_closing_bill'
       | 'credit_limit_user'
       | 'parent_account'
       | 'payment_patterns'

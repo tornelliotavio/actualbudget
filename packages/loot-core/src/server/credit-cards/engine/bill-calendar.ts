@@ -11,7 +11,10 @@ import type {
 
 export type BillCalendar = {
   period(referenceMonth: MonthString): BillPeriod;
+  /** Bill a purchase made on `date` belongs to. */
   monthForDate(date: DateString): MonthString;
+  /** Bill a charge the bank posted on `date` belongs to: closing day included. */
+  monthForPostDate(date: DateString): MonthString;
 };
 
 function assertDay(day: number, name: string) {
@@ -125,5 +128,16 @@ export function createBillCalendar(
     return month;
   }
 
-  return { period, monthForDate };
+  function monthForPostDate(date: DateString): MonthString {
+    let month = addMonths(date.slice(0, 7), -2);
+    for (let step = 0; step < 6; step++) {
+      if (date <= period(month).closingDate) {
+        return month;
+      }
+      month = addMonths(month, 1);
+    }
+    return month;
+  }
+
+  return { period, monthForDate, monthForPostDate };
 }

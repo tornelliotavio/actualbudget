@@ -22,7 +22,8 @@ export type CardProfileEntity = {
   closing_offset_user: number | null;
   due_day_provider: number | null;
   due_day_user: number | null;
-  closing_day_in_next_bill: boolean | null;
+  /** Purchases on the closing day stay on the closing bill (default: next bill). */
+  closing_day_on_closing_bill: boolean | null;
   credit_limit_user: number | null;
   parent_account: AccountEntity['id'] | null;
   connector: CardConnector | null;

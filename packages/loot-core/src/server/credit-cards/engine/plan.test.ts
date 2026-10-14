@@ -348,6 +348,32 @@ describe('planCardAccount', () => {
     });
   });
 
+  it('bills a charge by the day the bank posted it', () => {
+    const result = plan(
+      [
+        cardEntry({
+          id: 'closing-day',
+          date: '2026-10-04',
+          amount: -5490,
+          description: 'APPLE.COM/BILL',
+          provider: { postDate: '2026-10-04' },
+        }),
+        cardEntry({
+          id: 'late-post',
+          date: '2026-10-03',
+          amount: -2000,
+          description: 'PADARIA',
+          provider: { postDate: '2026-10-06' },
+        }),
+      ],
+      { schedule: inter },
+    );
+    expect(result.entries.map(entry => [entry.id, entry.bill])).toEqual([
+      ['closing-day', '2026-10'],
+      ['late-post', '2026-11'],
+    ]);
+  });
+
   it('keeps a bill the user chose', () => {
     const result = plan([
       cardEntry({

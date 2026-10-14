@@ -134,6 +134,15 @@ function resolveOwnBill(
   if (providerBill) {
     return { bill: providerBill, source: 'provider' };
   }
+  // Banks bill a charge by the day it posted, which can be days after the
+  // purchase: a purchase made right before closing may post after it.
+  const postDate = entry.provider?.postDate;
+  if (postDate) {
+    return {
+      bill: input.calendar.monthForPostDate(postDate),
+      source: 'provider',
+    };
+  }
   return { bill: input.calendar.monthForDate(entry.date), source: 'cycle' };
 }
 

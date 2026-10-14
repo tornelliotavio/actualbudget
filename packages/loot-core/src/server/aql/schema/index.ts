@@ -107,7 +107,7 @@ export const schema = {
     closing_offset_user: f('integer'),
     due_day_provider: f('integer'),
     due_day_user: f('integer'),
-    closing_day_in_next_bill: f('boolean'),
+    closing_day_on_closing_bill: f('boolean'),
     credit_limit_user: f('integer'),
     parent_account: f('id', { ref: 'accounts' }),
     connector: f('string'),

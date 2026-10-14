@@ -59,6 +59,8 @@ export type BillSource = 'user' | 'provider' | 'installment' | 'cycle';
 /** What the bank said about a card transaction, normalized. */
 export type ProviderFacts = {
   billId: string | null;
+  /** Day the charge posted to a bill; on or before that bill's closing day. */
+  postDate: DateString | null;
   installment: InstallmentInfo | null;
   purchaseDate: DateString | null;
   totalAmount: Cents | null;

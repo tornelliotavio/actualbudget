@@ -24,7 +24,7 @@ CREATE TABLE card_profiles
    closing_offset_user INTEGER,
    due_day_provider INTEGER,
    due_day_user INTEGER,
-   closing_day_in_next_bill INTEGER,
+   closing_day_on_closing_bill INTEGER,
    credit_limit_user INTEGER,
    parent_account TEXT,
    connector TEXT,

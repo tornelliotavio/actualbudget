@@ -102,6 +102,7 @@ export function providerFacts(raw: RawSyncedData): ProviderFacts {
   const cardNumber = text(raw['creditCardMetadata.cardNumber']);
   return {
     billId: text(raw['creditCardMetadata.billId']),
+    postDate: isoDay(raw['creditCardMetadata.billPostDate']),
     installment,
     purchaseDate: purchaseDate(raw, installment?.number ?? null),
     // Pluggy reports card amounts as positive charges.

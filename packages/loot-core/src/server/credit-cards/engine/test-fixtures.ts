@@ -11,6 +11,7 @@ const emptyStored: StoredCardFields = {
 
 const emptyProvider: ProviderFacts = {
   billId: null,
+  postDate: null,
   installment: null,
   purchaseDate: null,
   totalAmount: null,

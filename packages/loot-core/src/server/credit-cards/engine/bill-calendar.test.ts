@@ -48,6 +48,13 @@ describe('bill calendar', () => {
     expect(calendar.monthForDate('2026-11-05')).toBe('2026-12');
   });
 
+  it('puts a charge the bank posted on the closing day on the closing bill', () => {
+    const calendar = createBillCalendar(closesOnFifth);
+    expect(calendar.monthForPostDate('2026-11-05')).toBe('2026-11');
+    expect(calendar.monthForPostDate('2026-11-06')).toBe('2026-12');
+    expect(calendar.monthForPostDate('2026-10-31')).toBe('2026-11');
+  });
+
   it('can keep the closing day on the closing bill', () => {
     const calendar = createBillCalendar({
       ...closesOnFifth,

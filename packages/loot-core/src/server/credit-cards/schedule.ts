@@ -32,7 +32,7 @@ export function resolveSchedule(
   if (dueDay == null) {
     return null;
   }
-  const closingDayInNextBill = profile?.closing_day_in_next_bill ?? true;
+  const closingDayInNextBill = !profile?.closing_day_on_closing_bill;
 
   if (profile?.closing_rule === 'days_before_due') {
     const days = profile.closing_offset_user;
