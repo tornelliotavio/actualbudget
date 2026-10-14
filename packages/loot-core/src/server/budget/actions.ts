@@ -468,11 +468,11 @@ async function getFirstActivityMonth({
            FROM ${table}
           WHERE category = ? AND month <= ?
          UNION ALL
-         SELECT CAST(t.date / 100 AS INTEGER) AS month
+         SELECT CAST(t.budget_date / 100 AS INTEGER) AS month
            FROM v_transactions_internal_alive t
            LEFT JOIN accounts a ON a.id = t.account
           WHERE t.category = ?
-            AND CAST(t.date / 100 AS INTEGER) <= ?
+            AND CAST(t.budget_date / 100 AS INTEGER) <= ?
             AND a.offbudget = 0
        )`,
     [categoryId, endDbMonth, categoryId, endDbMonth],

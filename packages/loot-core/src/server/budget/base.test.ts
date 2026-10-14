@@ -510,4 +510,44 @@ describe('Base budget', () => {
     const jan = monthUtils.sheetForMonth('2017-01');
     expect(sheet.getCellValue(jan, `sum-amount-${foodId}`)).toBe(-1000);
   });
+
+  it('counts a card charge in the month its bill is due', async () => {
+    await sheet.loadSpreadsheet(db);
+
+    await db.insertCategoryGroup({ id: 'group1', name: 'group1' });
+    await db.insertCategoryGroup({
+      id: 'group2',
+      name: 'income',
+      is_income: 1,
+    });
+    const catId = await db.insertCategory({
+      name: 'foo',
+      cat_group: 'group1',
+    });
+    await db.insertAccount({ id: 'card', name: 'card' });
+
+    await createAllBudgets();
+
+    const id = await db.insertTransaction({
+      date: '2016-12-15',
+      amount: -5000,
+      account: 'card',
+      category: catId,
+      budget_date: '2017-01-10',
+    });
+    await sheet.waitOnSpreadsheet();
+
+    const spent = (month: string) =>
+      sheet.getCellValue(
+        monthUtils.sheetForMonth(month),
+        `sum-amount-${catId}`,
+      );
+    expect(spent('2016-12')).toBe(0);
+    expect(spent('2017-01')).toBe(-5000);
+
+    await db.updateTransaction({ id, budget_date: '2017-02-10' });
+    await sheet.waitOnSpreadsheet();
+    expect(spent('2017-01')).toBe(0);
+    expect(spent('2017-02')).toBe(-5000);
+  });
 });

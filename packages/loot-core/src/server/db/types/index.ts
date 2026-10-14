@@ -208,6 +208,16 @@ export type DbTransaction = {
   tombstone: 1 | 0;
   cleared: 1 | 0;
   reconciled: 1 | 0;
+  card_bill?: string | null;
+  card_bill_source?: string | null;
+  card_kind?: string | null;
+  card_purchase?: string | null;
+  installment_number?: number | null;
+  installment_count?: number | null;
+  projected?: 1 | 0 | null;
+  /** Day the budget counts the transaction on, when not its date. */
+  budget_date?: number | null;
+  bank_sync_missing_since?: number | null;
   // Unused in the codebase
   pending?: 1 | 0 | null;
   location?: string | null;

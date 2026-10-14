@@ -72,14 +72,14 @@ function getSumAmountsByMonth(
 ): Map<string, number> {
   const rows = db.runQuery<{ month: number; category: string; amount: number }>(
     `SELECT t.category AS category,
-            t.date / 100 AS month,
+            t.budget_date / 100 AS month,
             SUM(t.amount) AS amount
        FROM v_transactions_internal_alive t
        LEFT JOIN accounts a ON a.id = t.account
-      WHERE t.date >= ${rangeStart} AND t.date <= ${rangeEnd}
+      WHERE t.budget_date >= ${rangeStart} AND t.budget_date <= ${rangeEnd}
         AND t.category IS NOT NULL
         AND a.offbudget = 0
-      GROUP BY t.category, t.date / 100`,
+      GROUP BY t.category, t.budget_date / 100`,
     [],
     true,
   );
@@ -138,7 +138,7 @@ export function createCategory(cat, sheetName, prevSheetName, start, end) {
       const rows = db.runQuery<{ amount: number }>(
         `SELECT SUM(amount) as amount FROM v_transactions_internal_alive t
            LEFT JOIN accounts a ON a.id = t.account
-         WHERE t.date >= ${start} AND t.date <= ${end}
+         WHERE t.budget_date >= ${start} AND t.budget_date <= ${end}
            AND category = '${cat.id}' AND a.offbudget = 0`,
         [],
         true,
@@ -179,9 +179,12 @@ function handleAccountChange(months, oldValue, newValue) {
   }
 }
 
+// A card transaction counts in the month its bill is due (`budget_date`);
+// everything else in the month of its date.
 function handleTransactionChange(transaction, changedFields) {
   if (
     (changedFields.has('date') ||
+      changedFields.has('budget_date') ||
       changedFields.has('acct') ||
       changedFields.has('amount') ||
       changedFields.has('category') ||
@@ -190,7 +193,9 @@ function handleTransactionChange(transaction, changedFields) {
     transaction.date &&
     transaction.category
   ) {
-    const month = monthUtils.monthFromDate(db.fromDateRepr(transaction.date));
+    const month = monthUtils.monthFromDate(
+      db.fromDateRepr(transaction.budget_date ?? transaction.date),
+    );
     const sheetName = monthUtils.sheetForMonth(month);
 
     sheet
