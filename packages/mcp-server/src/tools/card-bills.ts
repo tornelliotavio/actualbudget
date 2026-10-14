@@ -1,46 +1,48 @@
 import * as api from '@actual-app/api';
+import { z } from 'zod';
 
 import type { ToolRegistrar } from './context';
-import { currentDay, jsonResult, toAmount } from './format';
+import { jsonResult, toAmount } from './format';
 
-export type CardBill = {
-  id: string;
-  dueDate: string;
-  totalAmount: number;
-  minimumPaymentAmount: number | null;
-  paidAmount: number;
+/** The fields of a card bill this tool reports, amounts in cents. */
+export type CardBillSummary = {
+  referenceMonth: string;
+  closingDate: string;
+  effectiveDueDate: string;
+  status: string;
+  total: number;
+  projectedCharges: number;
+  paid: number;
+  remaining: number;
+  minimumPayment: number | null;
+  complete: boolean;
 };
 
-/**
- * The current bill is the one due this month, otherwise the next one still
- * unpaid; the next bill is the one after it. Bills come oldest first.
- */
-export function selectCardBills(bills: readonly CardBill[], today: string) {
-  const month = today.slice(0, 7);
-  const current =
-    bills.find(bill => bill.dueDate.startsWith(month)) ??
-    bills.find(
-      bill =>
-        bill.dueDate >= `${month}-01` && bill.paidAmount < bill.totalAmount,
-    );
-  const next = current
-    ? bills.find(bill => bill.dueDate > current.dueDate)
-    : undefined;
-  return { current, next };
+export function describeCardBill(bill: CardBillSummary) {
+  const isClosed = bill.status !== 'open' && bill.status !== 'upcoming';
+  return {
+    month: bill.referenceMonth,
+    closing_date: bill.closingDate,
+    due_date: bill.effectiveDueDate,
+    status: bill.status,
+    total: toAmount(bill.total),
+    projected_installments: toAmount(bill.projectedCharges),
+    paid: toAmount(bill.paid),
+    remaining: toAmount(isClosed ? bill.remaining : bill.total),
+    minimum: bill.minimumPayment == null ? null : toAmount(bill.minimumPayment),
+    ...(bill.complete ? {} : { history_incomplete: true }),
+  };
 }
 
-export function describeCardBill(bill: CardBill | undefined) {
-  if (!bill) return null;
-  return {
-    due_date: bill.dueDate,
-    total: toAmount(bill.totalAmount),
-    minimum:
-      bill.minimumPaymentAmount == null
-        ? null
-        : toAmount(bill.minimumPaymentAmount),
-    paid: toAmount(bill.paidAmount),
-    remaining: toAmount(Math.max(bill.totalAmount - bill.paidAmount, 0)),
-  };
+/**
+ * The bill the card is on now and the ones after it, up to `count` bills.
+ * Bills come oldest first.
+ */
+export function selectCardBills<
+  T extends Pick<CardBillSummary, 'referenceMonth'>,
+>(bills: readonly T[], currentMonth: string | null, count: number): T[] {
+  const start = bills.findIndex(bill => bill.referenceMonth === currentMonth);
+  return start === -1 ? [] : bills.slice(start, start + count);
 }
 
 export const registerCardBillTools: ToolRegistrar = (server, ctx) => {
@@ -49,40 +51,72 @@ export const registerCardBillTools: ToolRegistrar = (server, ctx) => {
     {
       title: 'Credit card bills',
       description:
-        'The closed bills (faturas) of every credit card synced through Pluggy, as the bank reports them: the current bill (due this month, otherwise the next unpaid one) and the one after it, with due date, total, minimum payment, amount paid and amount remaining. A bill only appears once the card closes it.',
-      inputSchema: {},
+        'The bills (faturas) of every credit card account, month by month: the bill the card is on now (the oldest closed bill still unpaid, otherwise the open one) and the ones after it. Each bill has its closing and due dates, status (upcoming, open, closed, partially_paid, paid, overdue), total, the part of it that is projected installments, amount paid, amount remaining and minimum payment. Also each card limit, and the total due per month across cards. A bill is named after the month it is due in.',
+      inputSchema: {
+        months: z
+          .number()
+          .int()
+          .min(1)
+          .max(24)
+          .optional()
+          .describe(
+            'How many bills to list per card, from the current one (default 4).',
+          ),
+      },
       annotations: { readOnlyHint: true },
     },
-    () =>
+    ({ months = 4 }) =>
       ctx.session.read(async lib => {
-        const today = currentDay();
         const { data: accounts } = (await api.aqlQuery(
           api
             .q('accounts')
-            .filter({ closed: false, account_sync_source: 'pluggyai' })
+            .filter({ closed: false, kind: 'credit_card' })
             .select(['id', 'name']),
         )) as { data: { id: string; name: string }[] };
 
         const cards = [];
-        const errors = [];
+        const dueByMonth = new Map<string, number>();
         for (const account of accounts) {
-          const result = await lib.send('pluggyai-bills', { id: account.id });
-          if (!Array.isArray(result)) {
-            errors.push({ account: account.name, error: result.error });
+          const result = await lib.send('credit-card-bills', {
+            accountId: account.id,
+          });
+          if (result.status !== 'ok') {
+            cards.push({ account: account.name, status: result.status });
             continue;
           }
-          if (result.length === 0) continue;
-          const { current, next } = selectCardBills(result, today);
+          const bills = selectCardBills(
+            result.bills,
+            result.currentMonth,
+            months,
+          );
+          for (const bill of bills) {
+            const isClosed =
+              bill.status !== 'open' && bill.status !== 'upcoming';
+            const due = isClosed ? bill.remaining : bill.total;
+            dueByMonth.set(
+              bill.referenceMonth,
+              (dueByMonth.get(bill.referenceMonth) ?? 0) + due,
+            );
+          }
           cards.push({
             account: account.name,
-            current: describeCardBill(current),
-            next: describeCardBill(next),
+            limit:
+              result.limit.total == null
+                ? null
+                : {
+                    total: toAmount(result.limit.total),
+                    used: toAmount(result.limit.used),
+                    available: toAmount(result.limit.available ?? 0),
+                  },
+            bills: bills.map(describeCardBill),
           });
         }
+
         return jsonResult({
-          today,
           cards,
-          ...(errors.length > 0 ? { errors } : {}),
+          due_by_month: [...dueByMonth]
+            .sort(([a], [b]) => a.localeCompare(b))
+            .map(([month, cents]) => ({ month, amount: toAmount(cents) })),
         });
       }),
   );

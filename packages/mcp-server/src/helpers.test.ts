@@ -186,45 +186,43 @@ describe('monthsBetween', () => {
 });
 
 describe('selectCardBills', () => {
+  const bill = (referenceMonth: string, status: string, total: number) => ({
+    referenceMonth,
+    closingDate: `${referenceMonth}-04`,
+    effectiveDueDate: `${referenceMonth}-10`,
+    status,
+    total,
+    projectedCharges: 0,
+    paid: status === 'paid' ? total : 0,
+    remaining: status === 'paid' ? 0 : total,
+    minimumPayment: null,
+    complete: true,
+  });
   const bills = [
-    {
-      id: 'sep',
-      dueDate: '2026-09-13',
-      totalAmount: 225620,
-      minimumPaymentAmount: 33843,
-      paidAmount: 225620,
-    },
-    {
-      id: 'oct',
-      dueDate: '2026-10-13',
-      totalAmount: 249448,
-      minimumPaymentAmount: 37417,
-      paidAmount: 0,
-    },
+    bill('2026-10', 'paid', 94825),
+    bill('2026-11', 'open', 27590),
+    bill('2026-12', 'upcoming', 19500),
   ];
 
-  it('takes the bill due this month as current', () => {
-    const { current, next } = selectCardBills(bills, '2026-10-09');
-    expect(current?.id).toBe('oct');
-    expect(next).toBeUndefined();
+  it('starts at the bill the card is on now', () => {
+    expect(
+      selectCardBills(bills, '2026-11', 4).map(b => b.referenceMonth),
+    ).toEqual(['2026-11', '2026-12']);
+    expect(selectCardBills(bills, '2026-11', 1)).toHaveLength(1);
+    expect(selectCardBills(bills, null, 4)).toEqual([]);
   });
 
-  it('falls back to the next unpaid bill and the one after it', () => {
-    const { current, next } = selectCardBills(bills, '2026-08-20');
-    expect(current?.id).toBe('oct');
-    expect(next).toBeUndefined();
-    expect(selectCardBills(bills.slice(0, 1), '2026-10-09').current).toBe(
-      undefined,
-    );
-  });
-
-  it('reports what is left to pay', () => {
-    expect(describeCardBill({ ...bills[1], paidAmount: 100000 })).toEqual({
-      due_date: '2026-10-13',
-      total: 2494.48,
-      minimum: 374.17,
-      paid: 1000,
-      remaining: 1494.48,
+  it('reports an open bill as what is left to pay', () => {
+    expect(describeCardBill(bills[1])).toEqual({
+      month: '2026-11',
+      closing_date: '2026-11-04',
+      due_date: '2026-11-10',
+      status: 'open',
+      total: 275.9,
+      projected_installments: 0,
+      paid: 0,
+      remaining: 275.9,
+      minimum: null,
     });
   });
 });
