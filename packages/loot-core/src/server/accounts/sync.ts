@@ -1,10 +1,16 @@
 // @ts-strict-ignore
 import * as dateFns from 'date-fns';
-import { v4 as uuidv4 } from 'uuid';
+import { v4 as uuidv4, v5 as uuidv5 } from 'uuid';
 
 import * as asyncStorage from '#platform/server/asyncStorage';
 import { logger } from '#platform/server/log';
 import { aqlQuery } from '#server/aql';
+import {
+  finishAnyImport,
+  finishCardImport,
+  prepareCardImport,
+} from '#server/credit-cards/bank-sync';
+import { getSuppressedImports } from '#server/credit-cards/store';
 import * as db from '#server/db';
 import { TRANSACTION_SORT_INCREMENT } from '#server/db/sort';
 import { TransactionError } from '#server/errors';
@@ -279,6 +285,7 @@ async function downloadPluggyAiTransactions(
   acctId: AccountEntity['id'],
   since: string,
   fileId?: string,
+  createdAtFrom?: string,
 ) {
   const userToken = await asyncStorage.getItem('user-token');
   if (!userToken) return;
@@ -290,6 +297,7 @@ async function downloadPluggyAiTransactions(
     {
       accountId: acctId,
       startDate: since,
+      createdAtFrom,
     },
     {
       'X-ACTUAL-TOKEN': userToken,
@@ -310,6 +318,7 @@ async function downloadPluggyAiTransactions(
     transactions: singleRes.transactions.all,
     accountBalance: singleRes.balances,
     startingBalance: singleRes.startingBalance,
+    creditCard: res.creditCard ?? null,
   };
 
   logger.log('Response:', retVal);
@@ -587,7 +596,9 @@ async function normalizeBankSyncTransactions(transactions, acctId) {
         notes: importNotes && notes ? notes.trim().replace(/#/g, '##') : null,
         category: categoryIds.has(trans.category) ? trans.category : null,
         imported_id,
-        imported_payee: trans.imported_payee,
+        // Stored as null when empty, like a later match writes it, so a
+        // second sync of the same data changes nothing.
+        imported_payee: trans.imported_payee || null,
         cleared: trans.cleared,
         raw_synced_data: JSON.stringify(trans),
       },
@@ -621,6 +632,8 @@ export type ReconcileTransactionsOptions = MatchTransactionsOptions & {
   isPreview?: boolean;
   defaultCleared?: boolean;
   updateDates?: boolean;
+  /** Replace stored `raw_synced_data` with the bank's latest copy. */
+  refreshRawSyncedData?: boolean;
 };
 
 export type ReconcileTransactionsResult = {
@@ -645,6 +658,7 @@ export async function reconcileTransactions(
     updateDates = false,
     reimportDeleted,
     payeeNameNormalization,
+    refreshRawSyncedData = false,
   }: ReconcileTransactionsOptions = {},
 ): Promise<ReconcileTransactionsResult> {
   logger.log('Performing transaction reconciliation');
@@ -690,8 +704,11 @@ export async function reconcileTransactions(
         imported_payee: trans.imported_payee || null,
         notes: existing.notes || trans.notes || null,
         cleared: existing.cleared || trans.cleared || false,
-        raw_synced_data:
-          existing.raw_synced_data ?? trans.raw_synced_data ?? null,
+        // A card charge gets its bill id only once the bill closes, after it
+        // was first imported, so cards keep the bank's latest copy.
+        raw_synced_data: refreshRawSyncedData
+          ? (trans.raw_synced_data ?? existing.raw_synced_data ?? null)
+          : (existing.raw_synced_data ?? trans.raw_synced_data ?? null),
       };
 
       if (updateDates && trans.date) {
@@ -756,7 +773,9 @@ export async function reconcileTransactions(
       const { forceAddTransaction: _forceAddTransaction, ...newTrans } = trans;
       const finalTransaction = {
         ...newTrans,
-        id: uuidv4(),
+        id: importedTransactionId(acctId, trans, isBankSyncAccount),
+        // A deterministic id may belong to a transaction deleted earlier.
+        tombstone: false,
         category: trans.category || null,
         cleared: trans.cleared ?? defaultCleared,
       };
@@ -794,6 +813,23 @@ export async function reconcileTransactions(
     updated: updated.map(trans => trans.id),
     updatedPreview,
   };
+}
+
+const IMPORTED_TRANSACTION_NAMESPACE = '4f9d2b8e-61a3-4c7e-9b0d-3e5a7c1f2d84';
+
+/**
+ * Bank-synced transactions get an id derived from the account and the bank's
+ * id, so two devices importing the same transaction at once write the same
+ * row instead of two copies.
+ */
+function importedTransactionId(acctId, trans, isBankSyncAccount: boolean) {
+  if (!isBankSyncAccount || !trans.imported_id) {
+    return uuidv4();
+  }
+  return uuidv5(
+    `${acctId}:${trans.imported_id}`,
+    IMPORTED_TRANSACTION_NAMESPACE,
+  );
 }
 
 // Ranks fuzzy-match candidates by distance from transaction date, nearest first.
@@ -847,8 +883,15 @@ export async function matchTransactions(
   const hasMatched = new Set();
   const exactMatchedParentIds = new Set<db.DbViewTransaction['id']>();
 
+  const suppressed = await getSuppressedImports(acctId);
   const { normalized, payeesToCreate } = isBankSyncAccount
-    ? await normalizeBankSyncTransactions(transactions, acctId)
+    ? await normalizeBankSyncTransactions(
+        transactions.filter(
+          trans =>
+            !suppressed.has(trans.transactionId ?? trans.imported_id ?? ''),
+        ),
+        acctId,
+      )
     : await normalizeTransactions(transactions, acctId, {
         payeeNameNormalization,
       });
@@ -877,7 +920,7 @@ export async function matchTransactions(
         ? 'v_transactions'
         : 'v_transactions_internal';
       match = await db.first<db.DbTransaction>(
-        `SELECT * FROM ${table} WHERE imported_id = ? AND account = ?`,
+        `SELECT * FROM ${table} WHERE imported_id = ? AND account = ? AND IFNULL(projected, 0) = 0`,
         [trans.imported_id, acctId],
       );
 
@@ -924,7 +967,7 @@ export async function matchTransactions(
             -- If both ids are set, and we didn't match earlier then skip dedup
             (imported_id IS NULL OR ? IS NULL)
             AND date >= ? AND date <= ? AND amount = ?
-            AND account = ?`,
+            AND account = ? AND IFNULL(projected, 0) = 0`,
           [
             trans.imported_id || null,
             sevenDaysBefore,
@@ -953,7 +996,8 @@ export async function matchTransactions(
         >(
           `SELECT id, is_parent, parent_id, date, imported_id, payee, imported_payee, category, notes, reconciled, cleared, amount
           FROM v_transactions
-          WHERE date >= ? AND date <= ? AND amount = ? AND account = ?`,
+          WHERE date >= ? AND date <= ? AND amount = ? AND account = ?
+            AND IFNULL(projected, 0) = 0`,
           [sevenDaysBefore, sevenDaysAfter, trans.amount || 0, acctId],
         );
       }
@@ -1094,6 +1138,27 @@ export async function addTransactions(
   return newTransactions;
 }
 
+function downloadedIds(transactions): Set<string> {
+  return new Set(
+    transactions
+      .map(trans => trans.transactionId)
+      .filter(transactionId => transactionId != null),
+  );
+}
+
+/**
+ * Projected installments already counted in a bank balance that includes
+ * future installments (Open Finance reports the used limit) would count twice
+ * against a starting balance derived from it.
+ */
+async function projectedTotal(accountId: AccountEntity['id']) {
+  const row = await db.first<{ total: number | null }>(
+    'SELECT SUM(amount) AS total FROM transactions WHERE acct = ? AND projected = 1 AND tombstone = 0',
+    [accountId],
+  );
+  return row?.total ?? 0;
+}
+
 async function processBankSyncDownload(
   download,
   id,
@@ -1101,6 +1166,7 @@ async function processBankSyncDownload(
   initialSync = false,
   customStartingBalance?: number,
   customStartingDate?: string,
+  windowStart?: string,
 ) {
   // If syncing an account from sync source it must not use strictIdChecking. This allows
   // the fuzzy search to match transactions where the import IDs are different. It is a known quirk
@@ -1184,6 +1250,7 @@ async function processBankSyncDownload(
     const payee = await getStartingBalancePayee();
 
     return runMutator(async () => {
+      const isCard = await prepareCardImport(id, download.creditCard);
       const initialId = await db.insertTransaction({
         account: id,
         amount: balanceToUse,
@@ -1198,7 +1265,26 @@ async function processBankSyncDownload(
         isBankSyncAccount: true,
         strictIdChecking: useStrictIdChecking,
         updateDates,
+        refreshRawSyncedData: isCard,
       });
+
+      if (isCard) {
+        await finishCardImport(id, new Set(), startingBalanceDate);
+        if (
+          customStartingBalance === undefined &&
+          download.creditCard?.connector === 'open_finance'
+        ) {
+          const projected = await projectedTotal(id);
+          if (projected !== 0) {
+            await db.updateTransaction({
+              id: initialId,
+              amount: balanceToUse - projected,
+            });
+          }
+        }
+      }
+      await finishAnyImport();
+
       return {
         ...result,
         added: [initialId, ...result.added],
@@ -1212,6 +1298,7 @@ async function processBankSyncDownload(
   }));
 
   return runMutator(async () => {
+    const isCard = await prepareCardImport(id, download.creditCard);
     const result = await reconcileTransactions(
       id,
       importTransactions ? transactions : [],
@@ -1219,6 +1306,7 @@ async function processBankSyncDownload(
         isBankSyncAccount: true,
         strictIdChecking: useStrictIdChecking,
         updateDates,
+        refreshRawSyncedData: isCard,
       },
     );
 
@@ -1226,8 +1314,26 @@ async function processBankSyncDownload(
       await updateAccountBalance(id, currentBalance);
     }
 
+    if (isCard) {
+      await finishCardImport(
+        id,
+        importTransactions ? downloadedIds(transactions) : new Set(),
+        windowStart ?? monthUtils.currentDay(),
+      );
+    }
+    await finishAnyImport();
+
     return result;
   });
+}
+
+/** Two days before the last sync, so a sync that overlapped it misses nothing. */
+function createdAtFromLastSync(lastSync: string | null | undefined) {
+  const timestamp = Number(lastSync);
+  if (!lastSync || !Number.isFinite(timestamp)) {
+    return undefined;
+  }
+  return new Date(timestamp - 2 * 86400000).toISOString();
 }
 
 export async function syncAccount(
@@ -1255,6 +1361,7 @@ export async function syncAccount(
       acctId,
       syncStartDate,
       fileId,
+      createdAtFromLastSync(acctRow.last_sync),
     );
   } else if (acctRow.account_sync_source === 'akahu') {
     download = await downloadAkahuTransactions(acctId, syncStartDate);
@@ -1287,6 +1394,7 @@ export async function syncAccount(
     newAccount,
     customStartingBalance,
     customStartingDate,
+    syncStartDate,
   );
 }
 

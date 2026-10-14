@@ -288,6 +288,21 @@ export async function reconcileCardAccount(
 
     await writeProjected(accountId, transactions, plan.projected);
 
+    for (const { fromId, toId } of plan.inherit) {
+      const from = transactions.get(fromId);
+      const to = transactions.get(toId);
+      if (!from || !to) {
+        continue;
+      }
+      const carried = {
+        ...(!to.category && from.category ? { category: from.category } : {}),
+        ...(!to.payee && from.payee ? { payee: from.payee } : {}),
+      };
+      if (Object.keys(carried).length > 0) {
+        await db.updateTransaction({ id: toId, ...carried });
+      }
+    }
+
     for (const id of plan.removeProjected) {
       await db.deleteTransaction({ id });
     }

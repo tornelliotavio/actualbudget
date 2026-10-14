@@ -35,7 +35,13 @@ export async function makeCreditCardAccount(
   accountId: AccountEntity['id'],
   settings: CardSettingsInput = {},
 ): Promise<void> {
-  await db.update('accounts', { id: accountId, kind: 'credit_card' });
+  const account = await db.first<{ kind: string | null }>(
+    'SELECT kind FROM accounts WHERE id = ?',
+    [accountId],
+  );
+  if (account?.kind !== 'credit_card') {
+    await db.update('accounts', { id: accountId, kind: 'credit_card' });
+  }
 
   const existing = await db.first<{ id: string; tombstone: number }>(
     'SELECT id, tombstone FROM card_profiles WHERE id = ?',
@@ -48,20 +54,43 @@ export async function makeCreditCardAccount(
   };
 
   if (existing) {
-    await db.updateWithSchema('card_profiles', {
-      id: accountId,
-      tombstone: false,
-      ...Object.fromEntries(
-        Object.entries(userFields).filter(([, value]) => value != null),
-      ),
-    });
+    const changes = Object.fromEntries(
+      Object.entries(userFields).filter(([, value]) => value != null),
+    );
+    if (existing.tombstone || Object.keys(changes).length > 0) {
+      await db.updateWithSchema('card_profiles', {
+        id: accountId,
+        tombstone: false,
+        ...changes,
+      });
+    }
     return;
   }
 
+  const legacy = await legacyCardDays(accountId);
   await db.insertWithSchema('card_profiles', {
     id: accountId,
     ...userFields,
+    closing_day_provider: legacy?.closing_day ?? null,
+    due_day_provider: legacy?.due_day ?? null,
   });
+}
+
+/**
+ * Billing days saved by the first credit card module, used until the bank
+ * reports its own. Its `credit_card_*` tables are read-only leftovers.
+ */
+async function legacyCardDays(accountId: AccountEntity['id']) {
+  const table = await db.first<{ name: string }>(
+    "SELECT name FROM sqlite_master WHERE type = 'table' AND name = 'credit_cards'",
+  );
+  if (!table) {
+    return null;
+  }
+  return db.first<{ closing_day: number | null; due_day: number | null }>(
+    'SELECT closing_day, due_day FROM credit_cards WHERE account_id = ? AND tombstone = 0',
+    [accountId],
+  );
 }
 
 /** Changes the user overrides; `null` clears one, `undefined` keeps it. */

@@ -72,6 +72,11 @@ export type CardPlan = {
   purchases: Purchase[];
   /** Purchases folded into another; delete them. */
   removePurchases: string[];
+  /**
+   * Real installments that took the place of a projected one: what the user
+   * set on the projection (category, payee) carries over to the real row.
+   */
+  inherit: Array<{ fromId: string; toId: string }>;
   months: MonthString[];
   suggestions: PlanSuggestion[];
 };
@@ -309,6 +314,23 @@ export function planCardAccount(input: PlanInput): CardPlan {
     .map(entry => entry.id)
     .filter(id => !keep.has(id));
 
+  const projectedBySlot = new Map(
+    storedProjected
+      .filter(
+        entry => entry.stored.purchaseId && entry.stored.installmentNumber,
+      )
+      .map(entry => [
+        `${assignment.mergedInto.get(entry.stored.purchaseId!) ?? entry.stored.purchaseId}|${entry.stored.installmentNumber}`,
+        entry.id,
+      ]),
+  );
+  const inherit = entries.flatMap(entry => {
+    const fromId =
+      entry.purchaseId &&
+      projectedBySlot.get(`${entry.purchaseId}|${entry.installmentNumber}`);
+    return fromId && !keep.has(fromId) ? [{ fromId, toId: entry.id }] : [];
+  });
+
   const months = [
     ...new Set([
       ...entries.map(entry => entry.bill),
@@ -322,6 +344,7 @@ export function planCardAccount(input: PlanInput): CardPlan {
     removeProjected,
     purchases: [...purchases.values()],
     removePurchases: [...assignment.mergedInto.keys()],
+    inherit,
     months,
     suggestions,
   };
