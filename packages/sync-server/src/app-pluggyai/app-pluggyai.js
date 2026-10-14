@@ -11,6 +11,12 @@ import {
 import { isValidFileId } from '#util/paths';
 
 import { pluggyaiService } from './pluggyai-service';
+import {
+  getDate,
+  toActualBill,
+  toActualCreditData,
+  toActualTransaction,
+} from './pluggyai-transform';
 
 const app = express();
 export { app as handlers };
@@ -128,7 +134,7 @@ app.post(
 app.post(
   '/transactions',
   handleError(async (req, res) => {
-    const { accountId, startDate } = req.body || {};
+    const { accountId, startDate, createdAtFrom } = req.body || {};
     const fileId = req.get('X-Actual-File-Id');
     if (!!fileId) {
       if (!isValidFileId(fileId)) {
@@ -165,6 +171,7 @@ app.post(
         accountId,
         startDate,
         fileId,
+        createdAtFrom ?? null,
       );
 
       const account = await pluggyaiService.getAccountById(accountId, fileId);
@@ -197,47 +204,9 @@ app.post(
           continue;
         }
 
-        const newTrans = {};
+        const finalTrans = toActualTransaction(trans, account.type);
 
-        newTrans.booked = !(trans.status === 'PENDING');
-
-        const transactionDate = trans.date;
-
-        if (transactionDate < startDate && !trans.sandbox) {
-          continue;
-        }
-
-        newTrans.date = getDate(transactionDate);
-        newTrans.payeeName = getPayeeName(trans);
-        newTrans.notes = trans.descriptionRaw || trans.description;
-
-        if (account.type === 'CREDIT') {
-          if (trans.amountInAccountCurrency) {
-            trans.amountInAccountCurrency *= -1;
-          }
-
-          trans.amount *= -1;
-        }
-
-        let amountInCurrency = trans.amountInAccountCurrency ?? trans.amount;
-        amountInCurrency = Math.round(amountInCurrency * 100) / 100;
-
-        newTrans.transactionAmount = {
-          amount: amountInCurrency,
-          currency: trans.currencyCode,
-        };
-
-        newTrans.transactionId = trans.id;
-        newTrans.sortOrder = transactionDate.getTime();
-
-        newTrans.originalDate = getDate(transactionDate);
-        newTrans.date = getDate(getTransactionDateCorrected(trans));
-
-        delete trans.amount;
-
-        const finalTrans = { ...flattenObject(trans), ...newTrans };
-
-        if (newTrans.booked) {
+        if (finalTrans.booked) {
           booked.push(finalTrans);
         } else {
           pending.push(finalTrans);
@@ -247,20 +216,20 @@ app.post(
 
       const sortFunction = (a, b) => b.sortOrder - a.sortOrder;
 
-      const bookedSorted = booked.sort(sortFunction);
-      const pendingSorted = pending.sort(sortFunction);
-      const allSorted = all.sort(sortFunction);
-
       res.send({
         status: 'ok',
         data: {
           balances,
           startingBalance,
           transactions: {
-            all: allSorted,
-            booked: bookedSorted,
-            pending: pendingSorted,
+            all: all.sort(sortFunction),
+            booked: booked.sort(sortFunction),
+            pending: pending.sort(sortFunction),
           },
+          creditCard:
+            account.type === 'CREDIT'
+              ? await getCreditCardSnapshot(account, fileId)
+              : null,
         },
       });
     } catch (error) {
@@ -274,6 +243,25 @@ app.post(
     return;
   }),
 );
+
+/**
+ * Limits, dates and bills of a card. A failure here doesn't fail the sync:
+ * transactions still import, and the card keeps its previous facts.
+ */
+async function getCreditCardSnapshot(account, fileId) {
+  try {
+    const [item, bills] = await Promise.all([
+      pluggyaiService.getItemById(account.itemId, fileId),
+      pluggyaiService.getCreditCardBillsByAccountId(account.id, fileId),
+    ]);
+    return {
+      ...toActualCreditData(account, item?.connector),
+      bills: bills.map(toActualBill),
+    };
+  } catch (error) {
+    return { error: error.message };
+  }
+}
 
 app.post(
   '/bills',
@@ -320,16 +308,7 @@ app.post(
       const bills = (
         await pluggyaiService.getCreditCardBillsByAccountId(accountId, fileId)
       )
-        .map(bill => ({
-          id: bill.id,
-          dueDate: getDate(new Date(bill.dueDate)),
-          totalAmount: bill.totalAmount,
-          minimumPaymentAmount: bill.minimumPaymentAmount ?? null,
-          paidAmount: (bill.payments ?? []).reduce(
-            (sum, payment) => sum + payment.amount,
-            0,
-          ),
-        }))
+        .map(toActualBill)
         .sort((a, b) => a.dueDate.localeCompare(b.dueDate));
 
       res.send({ status: 'ok', data: { bills } });
@@ -343,71 +322,3 @@ app.post(
     }
   }),
 );
-
-function getDate(date) {
-  return date.toISOString().split('T')[0];
-}
-
-function flattenObject(obj, prefix = '') {
-  const result = {};
-
-  for (const [key, value] of Object.entries(obj)) {
-    const newKey = prefix ? `${prefix}.${key}` : key;
-
-    if (value === null) {
-      continue;
-    }
-
-    if (typeof value === 'object' && value !== null && !Array.isArray(value)) {
-      Object.assign(result, flattenObject(value, newKey));
-    } else {
-      result[newKey] = value;
-    }
-  }
-
-  return result;
-}
-
-function getPayeeName(trans) {
-  if (trans.merchant && (trans.merchant.name || trans.merchant.businessName)) {
-    return trans.merchant.name || trans.merchant.businessName || '';
-  }
-
-  if (trans.paymentData) {
-    const { receiver, payer } = trans.paymentData;
-
-    if (trans.type === 'DEBIT' && receiver) {
-      return receiver.name || receiver.documentNumber?.value || '';
-    }
-
-    if (trans.type === 'CREDIT' && payer) {
-      return payer.name || payer.documentNumber?.value || '';
-    }
-  }
-
-  return '';
-}
-
-//useful to avoid add month to day 31, which would result in day 01 skipping to the next month
-function addMonthsClamped(date, months) {
-  const result = new Date(date);
-  const day = result.getUTCDate();
-  result.setUTCDate(1);
-  result.setUTCMonth(result.getUTCMonth() + months);
-  const lastDay = new Date(
-    Date.UTC(result.getUTCFullYear(), result.getUTCMonth() + 1, 0),
-  ).getUTCDate();
-  result.setUTCDate(Math.min(day, lastDay));
-  return result;
-}
-
-function getTransactionDateCorrected(trans) {
-  if (trans.creditCardMetadata?.installmentNumber != null) {
-    return addMonthsClamped(
-      trans.creditCardMetadata.purchaseDate || trans.date,
-      trans.creditCardMetadata.installmentNumber - 1,
-    );
-  }
-
-  return trans.date;
-}

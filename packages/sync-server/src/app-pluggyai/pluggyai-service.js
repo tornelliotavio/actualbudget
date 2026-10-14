@@ -3,6 +3,8 @@ import { PluggyClient } from 'pluggy-sdk';
 
 import { SecretName, secretsService } from '#services/secrets-service';
 
+import { mergeTransactions } from './pluggyai-transform';
+
 const debugSensitive = createDebug('actual-sensitive:pluggy');
 
 const pluggyClients = new Map();
@@ -122,7 +124,28 @@ export const pluggyaiService = {
     }
   },
 
-  getTransactionsByAccountId: async (accountId, startDate, fileId) => {
+  getItemById: async (itemId, fileId) => {
+    try {
+      const client = getPluggyClient(fileId);
+      return await client.fetchItem(itemId);
+    } catch (error) {
+      console.error('Error fetching item');
+      debugSensitive('Error fetching item: %O', error);
+      throw error;
+    }
+  },
+
+  /**
+   * Transactions dated from `startDate`, plus those Pluggy created since
+   * `createdAtFrom`: card installments can arrive with a purchase date older
+   * than the sync window.
+   */
+  getTransactionsByAccountId: async (
+    accountId,
+    startDate,
+    fileId,
+    createdAtFrom = null,
+  ) => {
     try {
       const client = getPluggyClient(fileId);
 
@@ -136,9 +159,14 @@ export const pluggyaiService = {
 
       if (sandboxAccount) startDate = '2000-01-01';
 
-      let transactions = await client.fetchAllTransactions(accountId, {
+      const byDate = await client.fetchAllTransactions(accountId, {
         dateFrom: startDate,
       });
+      const byCreation =
+        createdAtFrom && !sandboxAccount
+          ? await client.fetchAllTransactions(accountId, { createdAtFrom })
+          : [];
+      let transactions = mergeTransactions(byDate, byCreation);
 
       if (sandboxAccount) {
         transactions = transactions.map(t => ({
