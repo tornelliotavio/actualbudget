@@ -1,6 +1,9 @@
 import { createApp } from '#server/app';
 import { aqlQuery } from '#server/aql';
-import { reconcileCardsTouchedBy } from '#server/credit-cards/edits';
+import {
+  cardAccountsOf,
+  reconcileCardsTouchedBy,
+} from '#server/credit-cards/edits';
 import * as db from '#server/db';
 import { mutator } from '#server/mutators';
 import { undoable } from '#server/undo';
@@ -41,6 +44,10 @@ async function handleBatchUpdateTransactions({
   learnCategories,
   runTransfers = true,
 }: Parameters<typeof batchUpdateTransactions>[0]) {
+  const editedIds = [...(updated ?? []), ...(deleted ?? [])]
+    .map(transaction => transaction.id)
+    .filter((id): id is string => id != null);
+  const cardsBefore = await cardAccountsOf(editedIds);
   const result = await batchUpdateTransactions({
     added,
     updated,
@@ -49,11 +56,8 @@ async function handleBatchUpdateTransactions({
     runTransfers,
   });
   await reconcileCardsTouchedBy(
-    [
-      ...result.added.map(transaction => transaction.id),
-      ...(updated ?? []).map(transaction => transaction.id),
-      ...(deleted ?? []).map(transaction => transaction.id),
-    ].filter((id): id is string => id != null),
+    [...result.added.map(transaction => transaction.id), ...editedIds],
+    cardsBefore,
   );
 
   return result;

@@ -482,4 +482,29 @@ describe('reconcileCardAccount', () => {
     const [bill] = (await getCardBills(accountId, { today: TODAY })).bills;
     expect(bill.charges).toBe(10000);
   });
+
+  it('clears the bill of a transaction moved out of a card', async () => {
+    const cardId = await createCard();
+    const checkingId = await accountsApp.handlers['account-create']({
+      name: 'Conta',
+    });
+    await transactionsApp.handlers['transaction-add']({
+      id: 'manual',
+      account: cardId,
+      date: '2026-10-10',
+      amount: -5000,
+    } as TransactionEntity);
+
+    await transactionsApp.handlers['transaction-update']({
+      id: 'manual',
+      account: checkingId,
+    } as TransactionEntity);
+
+    expect(
+      await db.first(
+        'SELECT card_bill, card_kind, budget_date FROM transactions WHERE id = ?',
+        ['manual'],
+      ),
+    ).toEqual({ card_bill: null, card_kind: null, budget_date: null });
+  });
 });
