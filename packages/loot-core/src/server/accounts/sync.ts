@@ -601,7 +601,12 @@ async function normalizeBankSyncTransactions(transactions, acctId) {
         // second sync of the same data changes nothing.
         imported_payee: trans.imported_payee || null,
         cleared: trans.cleared,
-        raw_synced_data: JSON.stringify(trans),
+        // An import that already paired this row with what it replaces.
+        ...(trans.forceAddTransaction ? { forceAddTransaction: true } : {}),
+        raw_synced_data: JSON.stringify({
+          ...trans,
+          forceAddTransaction: undefined,
+        }),
       },
     });
   }
