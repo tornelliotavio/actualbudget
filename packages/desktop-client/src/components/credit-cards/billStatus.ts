@@ -11,6 +11,15 @@ export function amountDue(
   return isClosed ? bill.remaining : bill.total;
 }
 
+/** The bill due in `month` when the card has one, otherwise `fallback`. */
+export function getDefaultBillMonth(
+  bills: ReadonlyArray<Pick<CardBill, 'referenceMonth'>>,
+  fallback: string | null,
+  month: string,
+) {
+  return bills.some(bill => bill.referenceMonth === month) ? month : fallback;
+}
+
 export function getBillStatusLabel(
   status: CardBillStatus,
   t: (text: string) => string,

@@ -149,7 +149,8 @@ objects; the sync server keeps them as ISO strings so `purchaseDate` survives.
 
 ## Where it shows
 
-- The card account page (`CardBillPanel`): one bill at a time with its status,
+- The card account page (`CardBillPanel`): one bill at a time, opening on the
+  bill due this calendar month (or `currentMonth` when the card has none) with its status,
   total and how it compares with the average of the complete, settled bills
   before it (`billTrend.ts`; an open bill shows its share of that average). A
   bar splits an open bill into what is already on the card and projected

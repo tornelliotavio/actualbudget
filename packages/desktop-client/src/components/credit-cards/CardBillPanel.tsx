@@ -28,7 +28,11 @@ import { BillBreakdown } from './BillBreakdown';
 import { BillCycleTrack } from './BillCycleTrack';
 import { BillHeadline } from './BillHeadline';
 import { BillHistoryChart } from './BillHistoryChart';
-import { getBillStatusColors, getBillStatusLabel } from './billStatus';
+import {
+  getBillStatusColors,
+  getBillStatusLabel,
+  getDefaultBillMonth,
+} from './billStatus';
 import { compareWithPastBills, getBillTrend } from './billTrend';
 
 type CardBillPanelProps = {
@@ -80,7 +84,13 @@ export function CardBillPanel({
     return null;
   }
 
-  const selectedMonth = month ?? data.currentMonth;
+  const selectedMonth =
+    month ??
+    getDefaultBillMonth(
+      data.bills,
+      data.currentMonth,
+      monthUtils.currentMonth(),
+    );
   const index = data.bills.findIndex(
     bill => bill.referenceMonth === selectedMonth,
   );
