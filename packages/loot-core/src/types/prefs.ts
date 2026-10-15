@@ -111,6 +111,18 @@ export type LocalPrefs = Partial<{
   sidebarWidth: number;
   'mobile.showSpentColumn': boolean;
   'mobile.bankSyncProvidersCollapsed': boolean;
+  /** Category groups collapsed in the overview's spending list. */
+  'home.collapsed': string[];
+  /** Overview sections collapsed on phones. */
+  'home.collapsedSections': string[];
+  /** Account bills were last paid from on the overview. */
+  'home.payFromAccount': string;
+  /** Months shown in the overview's spending trend. */
+  'home.trendRange': 6 | 12;
+  /** Group or category the overview's spending trend shows. */
+  'home.trendFilter':
+    | { type: 'all' }
+    | { type: 'group' | 'category'; id: string };
   /**
    * Timestamp (epoch ms) of the last automatic bank sync attempted by this
    * device. Tracked locally so a failing account can't cause repeated

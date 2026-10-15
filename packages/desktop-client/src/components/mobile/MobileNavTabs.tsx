@@ -9,6 +9,7 @@ import {
   SvgAdd,
   SvgCog,
   SvgCreditCard,
+  SvgHome,
   SvgPiggyBank,
   SvgReports,
   SvgStoreFront,
@@ -23,6 +24,7 @@ import { useDrag } from '@use-gesture/react';
 
 import { useIsTestEnv } from '#hooks/useIsTestEnv';
 import { useScrollListener } from '#hooks/useScrollListener';
+import { useSyncedPref } from '#hooks/useSyncedPref';
 import { useSyncServerStatus } from '#hooks/useSyncServerStatus';
 
 const COLUMN_COUNT = 3;
@@ -41,6 +43,7 @@ export function MobileNavTabs() {
   const syncServerStatus = useSyncServerStatus();
   const isTestEnv = useIsTestEnv();
   const isUsingServer = syncServerStatus !== 'no-server' || isTestEnv;
+  const [budgetType = 'envelope'] = useSyncedPref('budgetType');
   const [navbarState, setNavbarState] = useState<'default' | 'open' | 'hidden'>(
     'default',
   );
@@ -92,13 +95,24 @@ export function MobileNavTabs() {
     [api, isTestEnv],
   );
 
+  const budgetTab = {
+    name: t('Budget'),
+    path: '/budget',
+    style: navTabStyle,
+    Icon: SvgWallet,
+  };
+  // A tracking budget opens on the overview; its budget page moves down.
+  const hasOverview = budgetType === 'tracking';
+
   const navTabs = [
-    {
-      name: t('Budget'),
-      path: '/budget',
-      style: navTabStyle,
-      Icon: SvgWallet,
-    },
+    hasOverview
+      ? {
+          name: t('Overview'),
+          path: '/home',
+          style: navTabStyle,
+          Icon: SvgHome,
+        }
+      : budgetTab,
     {
       name: t('Transaction'),
       path: '/transactions/new',
@@ -123,6 +137,7 @@ export function MobileNavTabs() {
       style: navTabStyle,
       Icon: SvgCalendar3,
     },
+    ...(hasOverview ? [budgetTab] : []),
     {
       name: t('Payees'),
       path: '/payees',

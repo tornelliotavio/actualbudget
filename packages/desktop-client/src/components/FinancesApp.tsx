@@ -31,6 +31,8 @@ import { CardsPage } from './credit-cards/CardsPage';
 import { EnableBankingCallback } from './EnableBankingCallback';
 import { FeatureErrorFallback } from './FeatureErrorFallback';
 import { GlobalKeys } from './GlobalKeys';
+import { HomePage } from './home/HomePage';
+import { useDefaultRoute } from './home/useDefaultRoute';
 import { MobileBankSyncAccountEditPage } from './mobile/banksync/MobileBankSyncAccountEditPage';
 import { MobileNavTabs } from './mobile/MobileNavTabs';
 import { TransactionEdit } from './mobile/transactions/TransactionEdit';
@@ -48,8 +50,12 @@ import { Tour } from './tour/Tour';
 import { TourAutoOffer } from './tour/TourAutoOffer';
 import { TourProvider } from './tour/TourProvider';
 
+function DefaultRedirect() {
+  return <Navigate to={useDefaultRoute()} replace />;
+}
+
 function NarrowNotSupported({
-  redirectTo = '/budget',
+  redirectTo: redirectToProp,
   children,
 }: {
   redirectTo?: string;
@@ -57,6 +63,8 @@ function NarrowNotSupported({
 }) {
   const { isNarrowWidth } = useResponsive();
   const navigate = useNavigate();
+  const defaultRoute = useDefaultRoute();
+  const redirectTo = redirectToProp ?? defaultRoute;
   useEffect(() => {
     if (isNarrowWidth) {
       void navigate(redirectTo);
@@ -67,13 +75,15 @@ function NarrowNotSupported({
 
 function WideNotSupported({
   children,
-  redirectTo = '/budget',
+  redirectTo: redirectToProp,
 }: {
   redirectTo?: string;
   children: ReactElement;
 }) {
   const { isNarrowWidth } = useResponsive();
   const navigate = useNavigate();
+  const defaultRoute = useDefaultRoute();
+  const redirectTo = redirectToProp ?? defaultRoute;
   useEffect(() => {
     if (!isNarrowWidth) {
       void navigate(redirectTo);
@@ -255,9 +265,18 @@ export function FinancesApp() {
                   {isNarrowWidth && <MobilePageHeaderSlot />}
 
                   <Routes>
+                    <Route path="/" element={<DefaultRedirect />} />
+
                     <Route
-                      path="/"
-                      element={<Navigate to="/budget" replace />}
+                      path="/home"
+                      element={
+                        <ErrorBoundary
+                          FallbackComponent={FeatureErrorFallback}
+                          resetKeys={[location.pathname]}
+                        >
+                          <HomePage />
+                        </ErrorBoundary>
+                      }
                     />
 
                     <Route path="/reports/*" element={<Reports />} />
@@ -463,15 +482,13 @@ export function FinancesApp() {
                         }
                       />
                     )}
-                    {/* redirect all other traffic to the budget page */}
-                    <Route
-                      path="/*"
-                      element={<Navigate to="/budget" replace />}
-                    />
+                    {/* redirect all other traffic to the default page */}
+                    <Route path="/*" element={<DefaultRedirect />} />
                   </Routes>
                 </View>
 
                 <Routes>
+                  <Route path="/home" element={<MobileNavTabs />} />
                   <Route path="/budget" element={<MobileNavTabs />} />
                   <Route path="/accounts" element={<MobileNavTabs />} />
                   <Route path="/settings" element={<MobileNavTabs />} />

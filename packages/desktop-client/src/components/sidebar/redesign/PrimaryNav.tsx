@@ -1,6 +1,7 @@
 import { useTranslation } from 'react-i18next';
 
 import {
+  SvgHome,
   SvgLibrary,
   SvgReports,
   SvgTag,
@@ -13,6 +14,7 @@ import { spacing } from '@actual-app/components/tokens';
 import { View } from '@actual-app/components/view';
 
 import { useIsTestEnv } from '#hooks/useIsTestEnv';
+import { useSyncedPref } from '#hooks/useSyncedPref';
 import { useSyncServerStatus } from '#hooks/useSyncServerStatus';
 
 import { NavRow } from './NavRow';
@@ -22,6 +24,7 @@ export function PrimaryNav() {
   const syncServerStatus = useSyncServerStatus();
   const isTestEnv = useIsTestEnv();
   const isUsingServer = syncServerStatus !== 'no-server' || isTestEnv;
+  const [budgetType = 'envelope'] = useSyncedPref('budgetType');
 
   return (
     <View
@@ -31,6 +34,9 @@ export function PrimaryNav() {
         padding: `${spacing.xs}px ${spacing.sm}px 0`,
       }}
     >
+      {budgetType === 'tracking' && (
+        <NavRow title={t('Overview')} Icon={SvgHome} to="/home" />
+      )}
       <NavRow title={t('Budget')} Icon={SvgWallet} to="/budget" />
       <NavRow title={t('Reports')} Icon={SvgReports} to="/reports" />
       <NavRow title={t('Schedules')} Icon={SvgCalendar3} to="/schedules" />

@@ -24,6 +24,7 @@ import type { PayloadAction } from '@reduxjs/toolkit';
 
 import { accountQueries } from '#accounts';
 import { resetApp, setAppState } from '#app/appSlice';
+import type { HomeBill } from '#components/home/bills/homeBills';
 import type { SelectLinkedAccountsModalProps } from '#components/modals/SelectLinkedAccountsModal';
 import type { TransactionTableColumn } from '#components/transactions/table/columns';
 import { createAppAsyncThunk } from '#redux';
@@ -63,6 +64,12 @@ export type Modal =
       name: 'account-groups';
       options: {
         accountId: AccountEntity['id'];
+      };
+    }
+  | {
+      name: 'pay-bill';
+      options: {
+        bill: HomeBill;
       };
     }
   | {

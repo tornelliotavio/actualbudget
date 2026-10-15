@@ -4,6 +4,7 @@ import { Trans, useTranslation } from 'react-i18next';
 
 import {
   SvgCog,
+  SvgHome,
   SvgLibrary,
   SvgPiggyBank,
   SvgReports,
@@ -103,6 +104,7 @@ export function CommandBar() {
 
   const navigationItems = useMemo(
     () => [
+      { id: 'home', name: t('Overview'), path: '/home', Icon: SvgHome },
       { id: 'budget', name: t('Budget'), path: '/budget', Icon: SvgWallet },
       {
         id: 'reports-nav',

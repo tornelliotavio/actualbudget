@@ -7,6 +7,7 @@ import {
   SvgCheveronRight,
   SvgCog,
   SvgCreditCard,
+  SvgHome,
   SvgReports,
   SvgStoreFront,
   SvgTag,
@@ -18,6 +19,7 @@ import { View } from '@actual-app/components/view';
 
 import { useAccounts } from '#hooks/useAccounts';
 import { useIsTestEnv } from '#hooks/useIsTestEnv';
+import { useSyncedPref } from '#hooks/useSyncedPref';
 import { useSyncServerStatus } from '#hooks/useSyncServerStatus';
 
 import { Item } from './Item';
@@ -37,7 +39,13 @@ export function PrimaryButtons() {
     account => account.kind === 'credit_card' && !account.closed,
   );
 
+  // A tracking budget opens on the overview; its budget page moves under
+  // "More".
+  const [budgetType = 'envelope'] = useSyncedPref('budgetType');
+  const hasOverview = budgetType === 'tracking';
+
   const isActive = [
+    ...(hasOverview ? ['/budget'] : []),
     '/payees',
     '/rules',
     '/bank-sync',
@@ -53,7 +61,11 @@ export function PrimaryButtons() {
 
   return (
     <View data-testid="sidebar-primary-buttons" style={{ flexShrink: 0 }}>
-      <Item title={t('Budget')} Icon={SvgWallet} to="/budget" />
+      {hasOverview ? (
+        <Item title={t('Overview')} Icon={SvgHome} to="/home" />
+      ) : (
+        <Item title={t('Budget')} Icon={SvgWallet} to="/budget" />
+      )}
       <Item title={t('Reports')} Icon={SvgReports} to="/reports" />
       <Item title={t('Schedules')} Icon={SvgCalendar3} to="/schedules" />
       {hasCards && (
@@ -68,6 +80,14 @@ export function PrimaryButtons() {
       />
       {isOpen && (
         <>
+          {hasOverview && (
+            <SecondaryItem
+              title={t('Budget')}
+              Icon={SvgWallet}
+              to="/budget"
+              indent={15}
+            />
+          )}
           <SecondaryItem
             title={t('Payees')}
             Icon={SvgStoreFront}

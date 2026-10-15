@@ -73,6 +73,10 @@ the explicit unknown bucket) are explained in the notebook.
 
 ## Reports
 
+- The app opens on the Overview (`/home`, `fork/home/`) because the budget is
+  tracking: bills and what is left to pay, balances, spending by category
+  against the 3-month average, spending over time. The budget page is under
+  "More".
 - Dashboard "Este mês" (the first page): the `bills-card` and
   `month-summary-card` widgets (fork patch, see `fork/PATCHES.md`), the month's
   income/spending/savings summary cards, spending vs budget, spending by

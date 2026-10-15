@@ -2,10 +2,12 @@ import { useEffect } from 'react';
 
 import * as Platform from '@actual-app/core/shared/platform';
 
+import { useDefaultRoute } from '#components/home/useDefaultRoute';
 import { useNavigate } from '#hooks/useNavigate';
 
 export function GlobalKeys() {
   const navigate = useNavigate();
+  const defaultRoute = useDefaultRoute();
   useEffect(() => {
     const handleKeys = (e: KeyboardEvent) => {
       if (Platform.isBrowser) {
@@ -15,7 +17,7 @@ export function GlobalKeys() {
       if (e.metaKey) {
         switch (e.key) {
           case '1':
-            void navigate('/budget');
+            void navigate(defaultRoute);
             break;
           case '2':
             void navigate('/reports');
@@ -36,7 +38,7 @@ export function GlobalKeys() {
     document.addEventListener('keydown', handleKeys);
 
     return () => document.removeEventListener('keydown', handleKeys);
-  }, [navigate]);
+  }, [navigate, defaultRoute]);
 
   return null;
 }

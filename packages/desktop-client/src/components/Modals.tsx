@@ -13,6 +13,7 @@ import { useDispatch } from '#redux';
 
 import { EditSyncAccount } from './banksync/EditSyncAccount';
 import { CardSettingsModal } from './credit-cards/CardSettingsModal';
+import { PayBillModal } from './home/bills/PayBillModal';
 import { AccountAutocompleteModal } from './modals/AccountAutocompleteModal';
 import { AccountGroupsModal } from './modals/AccountGroupsModal';
 import { AccountMenuModal } from './modals/AccountMenuModal';
@@ -144,6 +145,9 @@ export function Modals() {
 
         case 'card-settings':
           return <CardSettingsModal key={key} {...modal.options} />;
+
+        case 'pay-bill':
+          return <PayBillModal key={key} {...modal.options} />;
 
         case 'close-account':
           return <CloseAccountModal key={key} {...modal.options} />;

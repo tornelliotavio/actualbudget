@@ -57,8 +57,8 @@ away when the charges arrive as transactions, is not recreated after the user
 deletes it, and is never made for bills closed before the card became a card
 account (`card_profiles.adjustments_from`), which its starting balance covers.
 
-**Bill payments.** A payment recorded by hand (a schedule posted early, a
-transfer entered in the register) is matched by bank sync itself when the
+**Bill payments.** A payment recorded by hand (the Overview's "Record
+payment", a schedule posted early) is matched by bank sync itself when the
 bank sends it: same account, exact amount, within seven days, on both the
 checking and the card side, keeping the transfer and the schedule link. Posting
 a schedule reconciles the card, so a card-bill schedule posted by hand or by
@@ -161,3 +161,6 @@ objects; the sync server keeps them as ISO strings so `purchaseDate` survives.
 - The credit cards page (`/cards`): every card's next six bills and the total
   per month.
 - The bills report card and the MCP tool `get_card_bills`.
+- The Overview (`fork/home/`): each card's bill of the month among the bills,
+  with "Record payment", and its current bill and available limit in the
+  balances.

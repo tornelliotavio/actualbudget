@@ -76,5 +76,7 @@ These apply to all code written in this checkout.
 - `fork/NOTES.md` — context about this instance.
 - `fork/credit-cards/` — the native credit card feature: design, data model,
   Pluggy behaviour per bank.
+- `fork/home/` — the Overview a tracking budget opens on: where its numbers
+  come from, paying bills, layout, fork translations (`locale-fork/`).
 
 Keep these current as part of the change, not afterwards.
