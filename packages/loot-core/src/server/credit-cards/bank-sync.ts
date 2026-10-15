@@ -1,3 +1,4 @@
+import { linkTransfers } from '#server/accounts/transfer-links';
 import * as db from '#server/db';
 import { addDays, currentDay } from '#shared/months';
 import type { AccountEntity } from '#types/models';
@@ -112,9 +113,13 @@ export async function finishCardImport(
   return reconcileCardAccount(accountId, { today });
 }
 
-/** Runs after any bank sync: a checking account can import a bill payment. */
+/**
+ * Runs after any bank sync: a checking account can import a bill payment or
+ * one side of a transfer between the user's accounts.
+ */
 export async function finishAnyImport({
   today = currentDay(),
 }: { today?: string } = {}) {
   await linkCardPayments({ today });
+  await linkTransfers({ today });
 }
