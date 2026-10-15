@@ -1,3 +1,4 @@
+import * as fs from '#platform/server/fs';
 import { createApp } from '#server/app';
 import * as db from '#server/db';
 import { mutator } from '#server/mutators';
@@ -14,6 +15,8 @@ import type { CardSettingsInput } from './profiles';
 import { makeCreditCardAccount, updateCardSettings } from './profiles';
 import { reconcileCardAccount } from './reconcile';
 import { revertCreditCardAccount } from './revert';
+import { importCardStatement, previewCardStatement } from './statements/import';
+import type { StatementText } from './statements/types';
 
 export type CreditCardsHandlers = {
   'credit-card-make': typeof makeCard;
@@ -24,6 +27,9 @@ export type CreditCardsHandlers = {
   'credit-card-bill-update': typeof updateBill;
   'credit-card-transaction-bill': typeof moveTransactionToBill;
   'credit-card-purchase-status': typeof setPurchaseStatus;
+  'credit-card-statement-file': typeof readStatementFile;
+  'credit-card-statement-preview': typeof previewStatement;
+  'credit-card-statement-import': typeof importStatement;
 };
 
 export const app = createApp<CreditCardsHandlers>();
@@ -38,6 +44,9 @@ app.method(
   mutator(undoable(moveTransactionToBill)),
 );
 app.method('credit-card-purchase-status', mutator(undoable(setPurchaseStatus)));
+app.method('credit-card-statement-file', readStatementFile);
+app.method('credit-card-statement-preview', previewStatement);
+app.method('credit-card-statement-import', mutator(undoable(importStatement)));
 
 async function makeCard({
   accountId,
@@ -150,4 +159,32 @@ async function setPurchaseStatus({
   }
   await db.updateWithSchema('card_purchases', { id, status });
   return reconcileCardAccount(row.account);
+}
+
+/**
+ * The bytes of a statement the user picked. Its text is extracted on the
+ * client, where the PDF library is loaded only when a statement is imported.
+ */
+async function readStatementFile({ filepath }: { filepath: string }) {
+  return new Uint8Array(await fs.readFile(filepath, 'binary'));
+}
+
+async function previewStatement({
+  accountId,
+  text,
+}: {
+  accountId: AccountEntity['id'];
+  text: StatementText;
+}) {
+  return previewCardStatement(accountId, text);
+}
+
+async function importStatement({
+  accountId,
+  text,
+}: {
+  accountId: AccountEntity['id'];
+  text: StatementText;
+}) {
+  return importCardStatement(accountId, text);
 }
