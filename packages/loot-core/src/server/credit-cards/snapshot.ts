@@ -5,6 +5,7 @@ import type {
   AccountEntity,
   CardBillEntity,
   CardBillPayment,
+  CardConnector,
   CardProfileEntity,
 } from '#types/models';
 
@@ -15,7 +16,7 @@ import { billOverrides, resolveSchedule } from './schedule';
 
 /** Card data the sync server sends next to the transactions. */
 export type ProviderCardSnapshot = {
-  connector: 'open_finance' | 'direct';
+  connector: CardConnector;
   creditLimit: number | null;
   availableCreditLimit: number | null;
   balanceCloseDate: string | null;

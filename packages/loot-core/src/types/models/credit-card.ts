@@ -2,7 +2,8 @@ import type { AccountEntity } from './account';
 
 export type CardClosingRule = 'fixed_day' | 'days_before_due';
 
-export type CardConnector = 'open_finance' | 'direct';
+/** Where a card's bills come from: bank sync, or PDF statements. */
+export type CardConnector = 'open_finance' | 'direct' | 'statement';
 
 export type CardEntryKind =
   | 'purchase'
