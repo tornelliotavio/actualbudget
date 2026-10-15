@@ -3,8 +3,10 @@ import * as asyncStorage from '#platform/server/asyncStorage';
 import { syncAccount } from '#server/accounts/sync';
 import * as db from '#server/db';
 import { loadMappings } from '#server/db/mappings';
+import { createSchedule, app as schedulesApp } from '#server/schedules/app';
 import { addSyncListener } from '#server/sync';
 import { handlers } from '#server/tests/mockSyncServer';
+import { app as transactionsApp } from '#server/transactions/app';
 import { loadRules } from '#server/transactions/transaction-rules';
 import * as monthUtils from '#shared/months';
 
@@ -599,5 +601,181 @@ describe('turning a card back into a regular account', () => {
     expect((await cardRows()).map(row => row.installment_number)).toEqual([
       3, 4, 5, 6,
     ]);
+  });
+});
+
+describe('bill payments recorded by hand', () => {
+  const pixOut = (date: string) =>
+    pluggyTransaction({
+      id: 'pix-out',
+      accountId: 'pluggy-checking',
+      date,
+      amount: -1407.53,
+      description: 'Pix enviado  - Mercado Pago Instituicao De Pagamento',
+      operationType: 'PIX',
+    });
+  const cardPayment = (date: string) =>
+    pluggyTransaction({
+      id: 'card-payment',
+      date,
+      amount: 1407.53,
+      description: 'Pagamento recebido',
+      operationType: 'PAGAMENTO_FATURA',
+    });
+
+  async function transferPayeeOfCard() {
+    const payee = await db.first<{ id: string }>(
+      'SELECT id FROM payees WHERE transfer_acct = ?',
+      [CARD],
+    );
+    return payee!.id;
+  }
+
+  async function recordPayment(date: string) {
+    await transactionsApp.handlers['transactions-batch-update']({
+      added: [
+        {
+          id: 'manual-payment',
+          account: CHECKING,
+          payee: await transferPayeeOfCard(),
+          amount: -140753,
+          date,
+          cleared: false,
+        },
+      ],
+    });
+  }
+
+  function paymentRows(account: string, amount: number) {
+    return db.all<{
+      id: string;
+      financial_id: string | null;
+      transferred_id: string | null;
+      schedule: string | null;
+      card_kind: string | null;
+      card_bill: string | null;
+    }>(
+      `SELECT id, financial_id, transferred_id, schedule, card_kind, card_bill
+       FROM transactions
+       WHERE acct = ? AND amount = ? AND tombstone = 0`,
+      [account, amount],
+    );
+  }
+
+  async function expectOnePaymentPerAccount() {
+    const debits = await paymentRows(CHECKING, -140753);
+    const credits = await paymentRows(CARD, 140753);
+    expect(debits).toHaveLength(1);
+    expect(credits).toHaveLength(1);
+    expect(debits[0].financial_id).toBe('pix-out');
+    expect(credits[0].financial_id).toBe('card-payment');
+    expect(debits[0].transferred_id).toBe(credits[0].id);
+    expect(credits[0].transferred_id).toBe(debits[0].id);
+    expect(credits[0].card_kind).toBe('payment');
+    return { debit: debits[0], credit: credits[0] };
+  }
+
+  beforeEach(async () => {
+    respond(CARD, []);
+    await syncCard();
+  });
+
+  it('merges the bank copies when checking syncs first', async () => {
+    await recordPayment('2026-10-13');
+
+    respond(CHECKING, [pixOut('2026-10-13')], null);
+    await syncChecking();
+    respond(CARD, [cardPayment('2026-10-13')]);
+    await syncCard();
+
+    await expectOnePaymentPerAccount();
+  });
+
+  it('merges the bank copies when the card syncs first, days later', async () => {
+    await recordPayment('2026-10-13');
+
+    respond(CARD, [cardPayment('2026-10-16')]);
+    await syncCard();
+    respond(CHECKING, [pixOut('2026-10-16')], null);
+    await syncChecking();
+
+    await expectOnePaymentPerAccount();
+  });
+
+  it('writes nothing when the same bank data syncs again', async () => {
+    await recordPayment('2026-10-13');
+    respond(CHECKING, [pixOut('2026-10-13')], null);
+    await syncChecking();
+    respond(CARD, [cardPayment('2026-10-13')]);
+    await syncCard();
+    const before = await db.all('SELECT * FROM transactions ORDER BY id');
+
+    respond(CHECKING, [pixOut('2026-10-13')], null);
+    await syncChecking();
+    respond(CARD, [cardPayment('2026-10-13')]);
+    await syncCard();
+
+    expect(await db.all('SELECT * FROM transactions ORDER BY id')).toEqual(
+      before,
+    );
+  });
+
+  it('matches the payment rather than a same-amount debit nearby', async () => {
+    await recordPayment('2026-10-13');
+    await transactionsApp.handlers['transactions-batch-update']({
+      added: [
+        {
+          id: 'other-debit',
+          account: CHECKING,
+          amount: -140753,
+          date: '2026-10-19',
+        },
+      ],
+    });
+
+    respond(CHECKING, [pixOut('2026-10-13')], null);
+    await syncChecking();
+
+    const pix = await db.first<{ id: string; transferred_id: string | null }>(
+      'SELECT id, transferred_id FROM transactions WHERE financial_id = ?',
+      ['pix-out'],
+    );
+    expect(pix?.id).toBe('manual-payment');
+    expect(pix?.transferred_id).not.toBeNull();
+  });
+
+  it('posts a card bill schedule with the bill amount and files it on the card', async () => {
+    schedulesApp.startServices();
+    onTestFinished(() => schedulesApp.stopServices());
+    const scheduleId = await createSchedule({
+      conditions: [
+        { op: 'is', field: 'account', value: CHECKING },
+        { op: 'is', field: 'payee', value: await transferPayeeOfCard() },
+        { op: 'isapprox', field: 'amount', value: -100000 },
+        { op: 'is', field: 'date', value: '2026-10-13' },
+      ],
+    });
+
+    await schedulesApp.handlers['schedule/post-transaction']({
+      id: scheduleId,
+      amount: -140753,
+      date: '2026-10-12',
+    });
+
+    const debits = await paymentRows(CHECKING, -140753);
+    expect(debits).toHaveLength(1);
+    expect(debits[0].schedule).toBe(scheduleId);
+    const credits = await paymentRows(CARD, 140753);
+    expect(credits).toHaveLength(1);
+    expect(credits[0].card_kind).toBe('payment');
+    expect(credits[0].card_bill).not.toBeNull();
+
+    respond(CHECKING, [pixOut('2026-10-13')], null);
+    await syncChecking();
+    respond(CARD, [cardPayment('2026-10-13')]);
+    await syncCard();
+
+    const { debit } = await expectOnePaymentPerAccount();
+    expect(debit.schedule).toBe(scheduleId);
   });
 });

@@ -57,7 +57,15 @@ away when the charges arrive as transactions, is not recreated after the user
 deletes it, and is never made for bills closed before the card became a card
 account (`card_profiles.adjustments_from`), which its starting balance covers.
 
-**Bill payments.** A payment credit on the card is linked to the matching
+**Bill payments.** A payment recorded by hand (a schedule posted early, a
+transfer entered in the register) is matched by bank sync itself when the
+bank sends it: same account, exact amount, within seven days, on both the
+checking and the card side, keeping the transfer and the schedule link. Posting
+a schedule reconciles the card, so a card-bill schedule posted by hand or by
+auto-post files its card half on a bill right away. The linking below covers
+payments that arrive from the bank on both sides.
+
+A payment credit on the card is linked to the matching
 debit in another account and both become one transfer. The debit must be the
 only one with the same amount within five days that is imported, not
 reconciled, not part of a split, on the same side of the budget, and

@@ -8,6 +8,7 @@ import { logger } from '#platform/server/log';
 import { addTransactions } from '#server/accounts/sync';
 import { createApp } from '#server/app';
 import { aqlQuery } from '#server/aql';
+import { reconcileCardsTouchedBy } from '#server/credit-cards/edits';
 import * as db from '#server/db';
 import { toDateRepr } from '#server/models';
 import { mutator, runMutator } from '#server/mutators';
@@ -36,6 +37,7 @@ import {
   recurConfigToRSchedule,
 } from '#shared/schedules';
 import type {
+  AccountEntity,
   RuleActionEntity,
   RuleConditionEntity,
   ScheduleEntity,
@@ -572,31 +574,43 @@ function onApplySync(oldValues, newValues) {
 // This is the service that move schedules forward automatically and
 // posts transactions
 
+/**
+ * Posts the transaction of a schedule. `amount`, `date` and `account`
+ * override the schedule's, e.g. to record a card bill paid in full from
+ * another account.
+ */
 async function postTransactionForSchedule({
   id,
   today,
+  amount,
+  date,
+  account,
 }: {
   id: string;
   today?: boolean;
+  amount?: number;
+  date?: string;
+  account?: AccountEntity['id'];
 }) {
   const { data } = await aqlQuery(q('schedules').filter({ id }).select('*'));
   const schedule = data[0];
-  if (schedule == null || schedule._account == null) {
+  const accountId = account ?? schedule?._account;
+  if (schedule == null || accountId == null) {
     return;
   }
 
   const transaction = {
     payee: schedule._payee,
-    account: schedule._account,
-    amount: getScheduledAmount(schedule._amount),
-    date: today ? currentDay() : schedule.next_date,
+    account: accountId,
+    amount: amount ?? getScheduledAmount(schedule._amount),
+    date: date ?? (today ? currentDay() : schedule.next_date),
     schedule: schedule.id,
     cleared: false,
   };
 
-  if (transaction.account) {
-    await addTransactions(transaction.account, [transaction]);
-  }
+  const added = await addTransactions(accountId, [transaction]);
+  // A schedule paying a card posts a transfer whose card half needs its bill.
+  await reconcileCardsTouchedBy(added ?? []);
 }
 
 async function getSchedule(id: string): Promise<ScheduleEntity | null> {
