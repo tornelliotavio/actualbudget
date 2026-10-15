@@ -668,21 +668,34 @@ class AccountInternal extends PureComponent<
     const account = this.props.accounts.find(acct => acct.id === accountId);
 
     if (account) {
+      const isCard = account.kind === 'credit_card';
       const res = await window.Actual.openFileDialog({
         filters: [
           {
             name: t('Financial files'),
-            extensions: ['qif', 'ofx', 'qfx', 'csv', 'tsv', 'xml'],
+            extensions: [
+              'qif',
+              'ofx',
+              'qfx',
+              'csv',
+              'tsv',
+              'xml',
+              // Credit card statements, read by an issuer's own importer.
+              ...(isCard ? ['pdf'] : []),
+            ],
           },
         ],
       });
 
       if (res) {
         if (accountId && res?.length > 0) {
+          const isStatement = res[0].toLowerCase().endsWith('.pdf');
           this.props.dispatch(
             pushModal({
               modal: {
-                name: 'import-transactions',
+                name: isStatement
+                  ? 'import-card-statement'
+                  : 'import-transactions',
                 options: {
                   accountId,
                   filename: res[0],

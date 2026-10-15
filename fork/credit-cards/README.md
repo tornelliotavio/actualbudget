@@ -147,6 +147,38 @@ kept a starting balance that already counted them; those were fixed by hand
 between banks and not used. `pluggy-sdk` turns ISO date strings into `Date`
 objects; the sync server keeps them as ISO strings so `purchaseDate` survives.
 
+## PDF statements
+
+Cards without bank sync (Renner, Riachuelo) are kept up to date by importing
+each closed bill's PDF from the account's Import button. Code:
+`packages/loot-core/src/server/credit-cards/statements/` and
+`packages/desktop-client/src/components/credit-cards/statement-import/`.
+
+- The client extracts the PDF's text with `pdfjs-dist`, loaded only when a
+  statement is imported, as cells with their x position
+  (`extractStatementText.ts`). The server reads it: `statementParsers` in
+  `statements/index.ts` lists one parser per issuer, picked by `detect`. A new
+  issuer is a new parser in that list.
+- A statement becomes provider data, so the card rules treat it like a Pluggy
+  card (`rows.ts`). The bill goes through `applyCardSnapshot`
+  (`connector: 'statement'`, total, due and closing dates, minimum, limit).
+  Each entry becomes a bank-sync row with `creditCardMetadata.*`: bill id,
+  purchase date and installment of older purchases, purchase total when
+  printed, card digits. The `imported_id` is deterministic, so importing a
+  statement again changes nothing.
+- Payment lines carry `PAGAMENTO_FATURA`, which is why these cards need no
+  "Bill payment descriptions". Payments are matched by bank-sync rules to the
+  transfer already on the card, or linked to the paying account by
+  `finishAnyImport`.
+- Entries typed in by hand are replaced (`import.ts`). Each charge is paired
+  with a manual entry of the same amount, one on the statement's bill first,
+  then the closest within 45 days. The manual entry is deleted, and its
+  category moves to the imported one. Replacing rows are force-added so
+  bank-sync matching cannot merge them with another manual entry. Import
+  older statements first.
+- The import modal previews every line as will be added, replaces the entry of
+  a date, already imported, or payment already on the card.
+
 ## Where it shows
 
 - The card account page (`CardBillPanel`): one bill at a time, opening on the
@@ -163,6 +195,8 @@ objects; the sync server keeps them as ISO strings so `purchaseDate` survives.
   panel, stacked.
 - The account menu: turn an account into a credit card, or a card back into a
   regular account.
+- The Import button of a card account: also accepts a PDF statement of a
+  supported issuer (see PDF statements).
 - The selection menu of card transactions: move to the previous or next bill,
   back to automatic, stop or resume projected installments.
 - Card settings: closing and due days, closing-day purchases, limit, bill

@@ -196,6 +196,7 @@
     "jsdom": "^29.1.1",
     "lru-cache": "^11.5.2",
     "mdast-util-newline-to-break": "^2.0.0",
+    "pdfjs-dist": "6.3.289",
     "plugins-service": "workspace:*",
     "re-resizable": "^6.11.2",
     "react": "19.2.7",

@@ -52,6 +52,14 @@ export type Modal =
       };
     }
   | {
+      name: 'import-card-statement';
+      options: {
+        accountId: string;
+        filename: string;
+        onImported: (didChange: boolean) => void;
+      };
+    }
+  | {
       name: 'add-account';
       options: {
         upgradingAccountId?: string;
