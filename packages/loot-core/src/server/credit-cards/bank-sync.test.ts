@@ -218,6 +218,46 @@ describe('credit card bank sync', () => {
     });
   });
 
+  it('leaves projected installments out of a first link starting balance', async () => {
+    const NEW_CARD = 'new-card';
+    await db.insertAccount({
+      id: NEW_CARD,
+      name: 'Cartão novo',
+      account_id: 'pluggy-new-card',
+      account_sync_source: 'pluggyai',
+    });
+    await db.insertPayee({ name: '', transfer_acct: NEW_CARD });
+    const transactions = [
+      tyres(3, '2026-09-13', { 'creditCardMetadata.billId': 'bill-oct' }),
+    ];
+    handlers['/pluggyai/transactions'] = () => ({
+      balances: [],
+      // The used limit: this installment and the three still to come.
+      startingBalance: -78000,
+      transactions: { all: transactions, booked: transactions, pending: [] },
+      creditCard: { ...cardSnapshot, connector: 'direct' },
+    });
+
+    await syncAccount(
+      undefined,
+      undefined,
+      NEW_CARD,
+      'pluggy-new-card',
+      'bank',
+    );
+
+    const start = await db.first<{ amount: number }>(
+      'SELECT amount FROM transactions WHERE acct = ? AND starting_balance_flag = 1',
+      [NEW_CARD],
+    );
+    expect(start?.amount).toBe(0);
+    const balance = await db.first<{ total: number }>(
+      'SELECT SUM(amount) AS total FROM transactions WHERE acct = ? AND tombstone = 0',
+      [NEW_CARD],
+    );
+    expect(balance?.total).toBe(-78000);
+  });
+
   it('dates installments by purchase and projects the rest', async () => {
     respond(CARD, [
       tyres(3, '2026-09-13', { 'creditCardMetadata.billId': 'bill-oct' }),

@@ -114,10 +114,17 @@ kept; installment dates keep following their bills.
 
 Seen in the 2026-10-14 export.
 
-| Card                  | Closes | Due | Notes                                                                                                                                                                                  |
-| --------------------- | ------ | --- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| Cartão Inter PF       | 4      | 10  | `billPostDate` is the posting date; charges posted on the closing day are on the closing bill. Payments: `PAGAMENTO ON LINE`, `PAGTO DEBITO AUTOMATICO`.                               |
-| Cartão MercadoPago PF | 5      | 10  | `billPostDate` is the closing date. Payments: `Pagamento recebido` with operation type `PAGAMENTO_FATURA`. A payment beyond what a bill asks for carries to the next bill as a credit. |
+| Card                  | Closes | Due | Notes                                                                                                                                                                                                                    |
+| --------------------- | ------ | --- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------ |
+| Cartão Inter PF       | 4      | 10  | `billPostDate` is the posting date; charges posted on the closing day are on the closing bill. Payments: `PAGAMENTO ON LINE`, `PAGTO DEBITO AUTOMATICO`. Direct connector, yet the balance includes future installments. |
+| Cartão MercadoPago PF | 5      | 10  | `billPostDate` is the closing date. Payments: `Pagamento recebido` with operation type `PAGAMENTO_FATURA`. A payment beyond what a bill asks for carries to the next bill as a credit.                                   |
+
+Pluggy reports a card's used limit as its balance, future installments
+included, for direct and Open Finance connectors alike. A first link therefore
+takes the projected installments out of the starting balance it derives from
+that balance. A card linked before card support became a card account later and
+kept a starting balance that already counted them; those were fixed by hand
+(Cartão Inter PF, 2026-10-15).
 
 `billId` only comes on posted transactions. `billForecastDate` is inconsistent
 between banks and not used. `pluggy-sdk` turns ISO date strings into `Date`

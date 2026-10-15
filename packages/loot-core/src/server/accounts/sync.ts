@@ -1163,8 +1163,9 @@ function downloadedIds(transactions): Set<string> {
 
 /**
  * Projected installments already counted in a bank balance that includes
- * future installments (Open Finance reports the used limit) would count twice
- * against a starting balance derived from it.
+ * future installments would count twice against a starting balance derived
+ * from it. Pluggy reports a card's used limit as its balance, through Open
+ * Finance and direct connectors alike (Inter's direct connector included).
  */
 async function projectedTotal(accountId: AccountEntity['id']) {
   const row = await db.first<{ total: number | null }>(
@@ -1285,10 +1286,7 @@ async function processBankSyncDownload(
 
       if (isCard) {
         await finishCardImport(id, new Set(), startingBalanceDate);
-        if (
-          customStartingBalance === undefined &&
-          download.creditCard?.connector === 'open_finance'
-        ) {
+        if (customStartingBalance === undefined) {
           const projected = await projectedTotal(id);
           if (projected !== 0) {
             await db.updateTransaction({
