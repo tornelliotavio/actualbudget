@@ -1,10 +1,12 @@
-import { send } from '@actual-app/core/platform/client/connection';
 import { q } from '@actual-app/core/shared/query';
 import { DEFAULT_UPCOMING_SCHEDULE_DAYS } from '@actual-app/core/shared/schedules';
-import type { ScheduleEntity } from '@actual-app/core/types/models';
-import { useQuery as useAsyncQuery } from '@tanstack/react-query';
+import type {
+  ScheduleEntity,
+  TransactionEntity,
+} from '@actual-app/core/types/models';
 
 import { useAccounts } from '#hooks/useAccounts';
+import { useAllCardBills } from '#hooks/useCardBills';
 import { usePayees } from '#hooks/usePayees';
 import { useQuery } from '#hooks/useQuery';
 import { getSchedulesQuery } from '#hooks/useSchedules';
@@ -23,37 +25,27 @@ import type {
   CardBill,
 } from './billOccurrences';
 
-const CARD_BILLS_STALE_MS = 30 * 1000;
-
 /**
- * Bills per card account, oldest first. A card without billing days is left
- * out, so its schedule falls back to the estimate.
+ * Bills per card account, oldest first, kept current as card data changes.
+ * A card without billing days is left out, so its schedule falls back to the
+ * estimate.
  */
-function useCardBills(accountIds: string[]) {
-  return useAsyncQuery({
-    queryKey: ['credit-card-bills-by-account', ...accountIds],
-    queryFn: async () => {
-      const entries = await Promise.all(
-        accountIds.map(async accountId => {
-          const result = await send('credit-card-bills', { accountId });
-          if (result.status !== 'ok') {
-            return null;
-          }
-          const bills: CardBill[] = result.bills.map(bill => ({
-            dueDate: bill.effectiveDueDate,
-            totalAmount: bill.total,
-            paidAmount: bill.paid,
-          }));
-          return [accountId, bills] as const;
-        }),
+function useBillsByCardAccount(accountIds: string[]) {
+  const { data } = useAllCardBills(accountIds);
+  const billsByAccount = new Map<string, CardBill[]>();
+  for (const { accountId, result } of data ?? []) {
+    if (result.status === 'ok') {
+      billsByAccount.set(
+        accountId,
+        result.bills.map(bill => ({
+          dueDate: bill.effectiveDueDate,
+          totalAmount: bill.total,
+          paidAmount: bill.paid,
+        })),
       );
-      return new Map<string, CardBill[]>(
-        entries.filter(entry => entry !== null),
-      );
-    },
-    enabled: accountIds.length > 0,
-    staleTime: CARD_BILLS_STALE_MS,
-  });
+    }
+  }
+  return billsByAccount;
 }
 
 type UseMonthBillsResult = {
@@ -62,7 +54,14 @@ type UseMonthBillsResult = {
   isLoading: boolean;
 };
 
-export function useMonthBills(month: string): UseMonthBillsResult {
+export type BillScheduleTransaction = BillTransaction &
+  Pick<TransactionEntity, 'id' | 'imported_id'>;
+
+/**
+ * Schedules, the transactions paying them around a month, and the card each
+ * card-bill schedule pays: what the month's bills are computed from.
+ */
+export function useBillSchedules(month: string) {
   const [upcomingLength = DEFAULT_UPCOMING_SCHEDULE_DAYS] = useSyncedPref(
     'upcomingScheduledTransactionLength',
   );
@@ -76,7 +75,7 @@ export function useMonthBills(month: string): UseMonthBillsResult {
   const { start, end } = getBillTransactionsRange(month);
 
   const { data: transactions, isLoading: isTransactionsLoading } =
-    useQuery<BillTransaction>(() => {
+    useQuery<BillScheduleTransaction>(() => {
       const scheduleIds = scheduleIdsKey ? scheduleIdsKey.split(',') : [];
 
       return q('transactions')
@@ -92,7 +91,7 @@ export function useMonthBills(month: string): UseMonthBillsResult {
             : { id: null },
         )
         .options({ splits: 'none' })
-        .select(['schedule', 'date', 'amount', 'account']);
+        .select(['id', 'schedule', 'date', 'amount', 'account', 'imported_id']);
     }, [scheduleIdsKey, start, end]);
 
   const { data: accounts = [] } = useAccounts();
@@ -102,20 +101,38 @@ export function useMonthBills(month: string): UseMonthBillsResult {
     payees,
     accounts,
   );
-  const { data: billsByAccount } = useCardBills(
+
+  return {
+    schedules: schedules ?? [],
+    transactions: transactions ?? [],
+    upcomingLength,
+    cardAccountsBySchedule,
+    isLoading: isSchedulesLoading || isTransactionsLoading,
+  };
+}
+
+export function useMonthBills(month: string): UseMonthBillsResult {
+  const {
+    schedules,
+    transactions,
+    upcomingLength,
+    cardAccountsBySchedule,
+    isLoading,
+  } = useBillSchedules(month);
+  const billsByAccount = useBillsByCardAccount(
     [...new Set(cardAccountsBySchedule.values())].sort(),
   );
   const cardBillsBySchedule = new Map<string, CardBill[]>();
   for (const [scheduleId, accountId] of cardAccountsBySchedule) {
-    const bills = billsByAccount?.get(accountId);
+    const bills = billsByAccount.get(accountId);
     if (bills) {
       cardBillsBySchedule.set(scheduleId, bills);
     }
   }
 
   const occurrences = getMonthBillOccurrences({
-    schedules: schedules ?? [],
-    transactions: transactions ?? [],
+    schedules,
+    transactions,
     month,
     upcomingLength,
     cardBillsBySchedule,
@@ -124,6 +141,6 @@ export function useMonthBills(month: string): UseMonthBillsResult {
   return {
     occurrences,
     totals: getBillTotals(occurrences),
-    isLoading: isSchedulesLoading || isTransactionsLoading,
+    isLoading,
   };
 }
