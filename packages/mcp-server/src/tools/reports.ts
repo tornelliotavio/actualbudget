@@ -47,6 +47,8 @@ async function totals(
     date: between(start, end),
     'account.offbudget': false,
     transfer_id: null,
+    // Future card installments are not spending yet.
+    projected: false,
     ...(account ? { account } : {}),
   };
   const field = groupBy === 'month' ? 'date' : GROUP_FIELDS[groupBy];

@@ -148,7 +148,7 @@ async function paymentCandidates(
       .filter({
         $and: [
           schedule.account ? { account: schedule.account } : {},
-          { schedule: null, transfer_id: null },
+          { schedule: null, transfer_id: null, projected: false },
           {
             date: between(
               addDays(schedule.next_date ?? today, -CANDIDATE_LOOKBACK_DAYS),

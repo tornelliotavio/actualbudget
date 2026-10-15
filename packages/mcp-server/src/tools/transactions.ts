@@ -22,6 +22,10 @@ type TransactionRow = {
   schedule: string | null;
   transfer_id: string | null;
   parent_id: string | null;
+  card_bill: string | null;
+  installment_number: number | null;
+  installment_count: number | null;
+  projected: boolean;
 };
 
 const FIELDS = [
@@ -38,6 +42,10 @@ const FIELDS = [
   'schedule',
   'transfer_id',
   'parent_id',
+  'card_bill',
+  'installment_number',
+  'installment_count',
+  'projected',
 ];
 
 export function describeTransaction(t: TransactionRow, lookups: Lookups) {
@@ -53,6 +61,12 @@ export function describeTransaction(t: TransactionRow, lookups: Lookups) {
     ...(t.schedule ? { schedule_id: t.schedule } : {}),
     ...(t.transfer_id ? { is_transfer: true } : {}),
     ...(t.parent_id ? { split_of: t.parent_id } : {}),
+    // Card bills are `<account id>:<YYYY-MM>`, named after the due month.
+    ...(t.card_bill ? { card_bill: t.card_bill.slice(-7) } : {}),
+    ...(t.installment_number && t.installment_count
+      ? { installment: `${t.installment_number}/${t.installment_count}` }
+      : {}),
+    ...(t.projected ? { projected: true } : {}),
   };
 }
 
@@ -85,6 +99,8 @@ export const UNCATEGORIZED_FILTER = {
   category: null,
   transfer_id: null,
   'account.offbudget': false,
+  // A projected installment gets its category when the real one arrives.
+  projected: false,
 };
 
 const findSchema = {
@@ -107,6 +123,12 @@ const findSchema = {
     .describe('Signed decimal; expenses are negative'),
   max_amount: z.number().optional(),
   schedule_id: z.string().optional(),
+  include_projected: z
+    .boolean()
+    .optional()
+    .describe(
+      'Include future credit card installments not charged yet (default false)',
+    ),
   limit: z.number().int().min(1).max(500).optional().describe('Default 50'),
 };
 
@@ -130,7 +152,7 @@ export const registerTransactionTools: ToolRegistrar = (server, ctx) => {
     {
       title: 'Find transactions',
       description:
-        'Search transactions, newest first. Split transactions appear as their individual parts. Returns the matching rows plus the count and sum of everything that matched, beyond the limit too.',
+        'Search transactions, newest first. Split transactions appear as their individual parts. Returns the matching rows plus the count and sum of everything that matched, beyond the limit too. Credit card transactions carry the bill they are on (card_bill, the month it is due) and, for installments, installment ("3/6"); future installments not charged yet are projected and only returned with include_projected.',
       inputSchema: findSchema,
       annotations: { readOnlyHint: true },
     },
@@ -168,6 +190,7 @@ export const registerTransactionTools: ToolRegistrar = (server, ctx) => {
           clauses.push({ amount: { $lte: toCents(args.max_amount) } });
         }
         if (args.schedule_id) clauses.push({ schedule: args.schedule_id });
+        if (!args.include_projected) clauses.push({ projected: false });
 
         const base = api.q('transactions').filter({ $and: clauses });
         const [{ data: rows }, { data: sum }, { data: count }] =
