@@ -65,6 +65,14 @@ uncategorized or linked to a schedule that pays the card; a schedule that pays t
 days is marked paid by it. When the checking side was already a transfer whose
 card half was created locally, the imported credit replaces that half.
 
+**Transfers between the user's accounts** (`accounts/transfer-links.ts`, after
+the card payments). An imported debit and an imported credit of the same
+amount in two accounts on the same side of the budget, within two days, both
+uncategorized and described as a transfer (Pix, TED, DOC, "Pagamento Fatura",
+or that Pluggy operation type), become one transfer when each is the only
+candidate for the other. A bank copy of a transfer entered by hand or posted
+by a schedule replaces that transfer.
+
 **Budget.** Card charges count in the month their bill is due
 (`transactions.budget_date`); everything else in the month of its date. The
 category drill-down from the budget filters by budget month.
