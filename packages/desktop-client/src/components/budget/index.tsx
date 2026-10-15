@@ -1,7 +1,6 @@
 // @ts-strict-ignore
 import React, { useEffect, useEffectEvent, useMemo, useState } from 'react';
 import type { ComponentType } from 'react';
-import { useTranslation } from 'react-i18next';
 
 import { styles } from '@actual-app/components/styles';
 import { View } from '@actual-app/components/view';
@@ -24,10 +23,9 @@ import {
 } from '#budget';
 import { useCategories } from '#hooks/useCategories';
 import { useGlobalPref } from '#hooks/useGlobalPref';
-import { useLocale } from '#hooks/useLocale';
 import { useLocalPref } from '#hooks/useLocalPref';
-import { useNavigate } from '#hooks/useNavigate';
 import { SheetNameProvider } from '#hooks/useSheetName';
+import { useShowCategoryActivity } from '#hooks/useShowCategoryActivity';
 import { useSpreadsheet } from '#hooks/useSpreadsheet';
 import { useSyncedPref } from '#hooks/useSyncedPref';
 
@@ -39,11 +37,8 @@ import { TrackingBudgetProvider } from './tracking/TrackingBudgetContext';
 import { prewarmAllMonths, prewarmMonth } from './util';
 
 export function Budget() {
-  const { t } = useTranslation();
-  const locale = useLocale();
   const currentMonth = monthUtils.currentMonth();
   const spreadsheet = useSpreadsheet();
-  const navigate = useNavigate();
   const [summaryCollapsed, setSummaryCollapsedPref] = useLocalPref(
     'budget.summaryCollapsed',
   );
@@ -134,29 +129,9 @@ export function Budget() {
     });
   };
 
+  const showCategoryActivity = useShowCategoryActivity();
   const onShowActivity = (categoryId, month) => {
-    const filterConditions = [
-      { field: 'category', op: 'is', value: categoryId, type: 'id' },
-      {
-        field: 'date',
-        op: 'is',
-        value: month,
-        options: { month: true },
-        type: 'date',
-        // Card charges count in the month their bill is due.
-        customName: t('Budget month: {{month}}', {
-          month: monthUtils.format(month, 'MMMM yyyy', locale),
-        }),
-        queryFilter: { budget_date: { $transform: '$month', $eq: month } },
-      },
-    ];
-    void navigate('/accounts', {
-      state: {
-        goBack: true,
-        filterConditions,
-        categoryId,
-      },
-    });
+    showCategoryActivity(categoryId, month);
   };
 
   const saveCategory = useSaveCategoryMutation();
