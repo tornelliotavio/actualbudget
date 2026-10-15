@@ -1,6 +1,6 @@
 import i18n from 'i18next';
 
-import { availableLanguages, setI18NextLanguage } from './i18n';
+import { availableLanguages, loadLanguage, setI18NextLanguage } from './i18n';
 
 vi.mock('i18next', () => {
   const i18nMock = {
@@ -17,7 +17,17 @@ vi.mock('./languages', () => ({
   languages: {
     '/locale/en.json': vi.fn(),
     '/locale/uk.json': vi.fn(),
-    '/locale/pt-BR.json': vi.fn(),
+    '/locale/pt-BR.json': vi.fn(async () => ({
+      default: { Budget: 'Orçamento', Reports: 'Relatórios' },
+    })),
+  },
+  forkLanguages: {
+    '/locale-fork/pt-BR.json': vi.fn(async () => ({
+      default: { Overview: 'Painel', Reports: 'Relatórios do fork' },
+    })),
+    '/locale-fork/eo.json': vi.fn(async () => ({
+      default: { Overview: 'Superrigardo' },
+    })),
   },
 }));
 
@@ -85,5 +95,20 @@ describe('setI18NextLanguage', () => {
       'Unknown locale EN, falling back to en',
     );
     expect(vi.mocked(i18n).changeLanguage).toHaveBeenCalledWith('en');
+  });
+});
+
+describe('loadLanguage', () => {
+  test('merges the fork translations over upstream', async () => {
+    expect(await loadLanguage('pt-BR')).toEqual({
+      Budget: 'Orçamento',
+      Overview: 'Painel',
+      Reports: 'Relatórios do fork',
+    });
+  });
+
+  test('offers a language only the fork translates', async () => {
+    expect(availableLanguages).toContain('eo');
+    expect(await loadLanguage('eo')).toEqual({ Overview: 'Superrigardo' });
   });
 });

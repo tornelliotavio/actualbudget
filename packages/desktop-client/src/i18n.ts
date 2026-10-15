@@ -4,20 +4,49 @@ import * as Platform from '@actual-app/core/shared/platform';
 import i18n from 'i18next';
 import resourcesToBackend from 'i18next-resources-to-backend';
 
-import { languages } from './languages';
+import { forkLanguages, languages } from './languages';
+
+const languageOf = (path: string) => path.split('/')[2].split('.')[0];
 
 export const availableLanguages = Platform.isPlaywright
   ? []
-  : Object.keys(languages).map(path => path.split('/')[2].split('.')[0]);
+  : [
+      ...new Set(
+        [...Object.keys(languages), ...Object.keys(forkLanguages)].map(
+          languageOf,
+        ),
+      ),
+    ];
+
+const upstreamPath = (language: string) => `/locale/${language}.json`;
+const forkPath = (language: string) => `/locale-fork/${language}.json`;
 
 const isLanguageAvailable = (language: string) =>
-  Object.hasOwn(languages, `/locale/${language}.json`);
+  Object.hasOwn(languages, upstreamPath(language)) ||
+  Object.hasOwn(forkLanguages, forkPath(language));
 
-const loadLanguage = (language: string) => {
+type TranslationModule = { default?: Record<string, string> } & Record<
+  string,
+  unknown
+>;
+
+const translationsOf = (module: unknown) => {
+  if (module == null) {
+    return {};
+  }
+  const { default: content, ...rest } = module as TranslationModule;
+  return content ?? rest;
+};
+
+export const loadLanguage = async (language: string) => {
   if (!isLanguageAvailable(language)) {
     throw new Error(`Unknown locale ${language}`);
   }
-  return languages[`/locale/${language}.json`]();
+  const [upstream, fork] = await Promise.all([
+    languages[upstreamPath(language)]?.(),
+    forkLanguages[forkPath(language)]?.(),
+  ]);
+  return { ...translationsOf(upstream), ...translationsOf(fork) };
 };
 
 void i18n
