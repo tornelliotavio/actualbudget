@@ -8,6 +8,9 @@ import { handlers } from '#server/tests/mockSyncServer';
 import { loadRules } from '#server/transactions/transaction-rules';
 import * as monthUtils from '#shared/months';
 
+import { makeCreditCardAccount } from './profiles';
+import { revertCreditCardAccount } from './revert';
+
 vi.mock('#shared/months', async () => ({
   ...(await vi.importActual('#shared/months')),
   currentDay: vi.fn(),
@@ -534,5 +537,67 @@ describe('credit card bank sync', () => {
     await syncCard();
 
     expect((await cardRows()).map(r => r.financial_id)).toContain('posted');
+  });
+});
+
+describe('turning a card back into a regular account', () => {
+  async function accountKind() {
+    const row = await db.first<{ kind: string }>(
+      'SELECT kind FROM accounts WHERE id = ?',
+      [CARD],
+    );
+    return row?.kind;
+  }
+
+  it('drops what the card derived and keeps the bank transactions', async () => {
+    respond(CARD, [
+      tyres(3, '2026-09-13', { 'creditCardMetadata.billId': 'bill-oct' }),
+    ]);
+    await syncCard();
+    expect(await accountKind()).toBe('credit_card');
+
+    await revertCreditCardAccount(CARD);
+
+    expect(await accountKind()).toBe('standard');
+    const rows = await cardRows();
+    expect(
+      rows.map(row => [
+        row.financial_id,
+        row.date,
+        row.card_bill,
+        row.installment_number,
+        row.projected,
+        row.budget_date,
+      ]),
+    ).toEqual([['tyres-3', 20260911, null, null, 0, null]]);
+  });
+
+  it('stays a regular account when the bank syncs again', async () => {
+    respond(CARD, [
+      tyres(3, '2026-09-13', { 'creditCardMetadata.billId': 'bill-oct' }),
+    ]);
+    await syncCard();
+    await revertCreditCardAccount(CARD);
+
+    await syncCard();
+
+    expect(await accountKind()).toBe('standard');
+    expect((await cardRows()).map(row => row.projected)).toEqual([0]);
+  });
+
+  it('recreates the projections when it becomes a card again', async () => {
+    respond(CARD, [
+      tyres(3, '2026-09-13', { 'creditCardMetadata.billId': 'bill-oct' }),
+    ]);
+    await syncCard();
+    await revertCreditCardAccount(CARD);
+
+    await makeCreditCardAccount(CARD);
+    await syncCard();
+
+    expect(await accountKind()).toBe('credit_card');
+    expect((await cardRows()).map(row => row.installment_number)).toEqual([
+      3, 4, 5, 6,
+    ]);
   });
 });

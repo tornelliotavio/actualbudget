@@ -739,7 +739,8 @@ type AccountMenuProps = {
       | 'toggle-net-worth-chart'
       | 'manage-columns'
       | 'account-group'
-      | 'make-credit-card',
+      | 'make-credit-card'
+      | 'revert-credit-card',
   ) => void;
 };
 
@@ -795,14 +796,21 @@ function AccountMenu({
             : t('Show reconciled transactions'),
         },
         { name: 'export', text: t('Export') },
-        ...(account.kind !== 'credit_card' && !account.closed
-          ? [
-              {
-                name: 'make-credit-card',
-                text: t('Turn into a credit card'),
-              } as const,
-            ]
-          : []),
+        ...(account.closed
+          ? []
+          : account.kind === 'credit_card'
+            ? [
+                {
+                  name: 'revert-credit-card',
+                  text: t('Turn back into a regular account'),
+                } as const,
+              ]
+            : [
+                {
+                  name: 'make-credit-card',
+                  text: t('Turn into a credit card'),
+                } as const,
+              ]),
         ...(account && !account.closed
           ? canSync
             ? [

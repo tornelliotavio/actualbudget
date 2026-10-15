@@ -3,7 +3,7 @@ import type { AccountEntity, TransactionEntity } from '#types/models';
 
 import { reconcileCardAccount } from './reconcile';
 
-const CARD_COLUMNS = {
+export const CARD_COLUMNS = {
   card_bill: null,
   card_bill_source: null,
   card_kind: null,

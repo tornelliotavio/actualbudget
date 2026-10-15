@@ -13,9 +13,11 @@ import { billRowId } from './engine/ids';
 import type { CardSettingsInput } from './profiles';
 import { makeCreditCardAccount, updateCardSettings } from './profiles';
 import { reconcileCardAccount } from './reconcile';
+import { revertCreditCardAccount } from './revert';
 
 export type CreditCardsHandlers = {
   'credit-card-make': typeof makeCard;
+  'credit-card-revert': typeof revertCard;
   'credit-card-settings-update': typeof updateSettings;
   'credit-card-bills': typeof getBills;
   'credit-card-reconcile': typeof reconcile;
@@ -26,6 +28,7 @@ export type CreditCardsHandlers = {
 
 export const app = createApp<CreditCardsHandlers>();
 app.method('credit-card-make', mutator(undoable(makeCard)));
+app.method('credit-card-revert', mutator(undoable(revertCard)));
 app.method('credit-card-settings-update', mutator(undoable(updateSettings)));
 app.method('credit-card-bills', getBills);
 app.method('credit-card-reconcile', mutator(undoable(reconcile)));
@@ -42,6 +45,10 @@ async function makeCard({
 }: { accountId: AccountEntity['id'] } & CardSettingsInput) {
   await makeCreditCardAccount(accountId, settings);
   return reconcileCardAccount(accountId);
+}
+
+async function revertCard({ accountId }: { accountId: AccountEntity['id'] }) {
+  await revertCreditCardAccount(accountId);
 }
 
 async function updateSettings({

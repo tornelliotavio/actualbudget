@@ -79,6 +79,34 @@ export async function makeCreditCardAccount(
 }
 
 /**
+ * Makes a card account a regular account again. The profile is tombstoned
+ * rather than deleted: it marks the account as one the user does not want as
+ * a card, and turning it into a card again restores the user's settings.
+ */
+export async function makeStandardAccount(
+  accountId: AccountEntity['id'],
+): Promise<void> {
+  await db.update('accounts', { id: accountId, kind: 'standard' });
+  if (await getCardProfile(accountId)) {
+    await db.updateWithSchema('card_profiles', {
+      id: accountId,
+      tombstone: true,
+    });
+  }
+}
+
+/** Whether the user turned this account from a card back into a regular one. */
+export async function isCardDeclined(
+  accountId: AccountEntity['id'],
+): Promise<boolean> {
+  const profile = await db.first<{ tombstone: number }>(
+    'SELECT tombstone FROM card_profiles WHERE id = ?',
+    [accountId],
+  );
+  return profile?.tombstone === 1;
+}
+
+/**
  * Billing days saved by the first credit card module, used until the bank
  * reports its own. Its `credit_card_*` tables are read-only leftovers.
  */

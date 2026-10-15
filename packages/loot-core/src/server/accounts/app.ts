@@ -5,7 +5,10 @@ import * as asyncStorage from '#platform/server/asyncStorage';
 import * as connection from '#platform/server/connection';
 import { logger } from '#platform/server/log';
 import { createApp } from '#server/app';
-import { makeCreditCardAccount } from '#server/credit-cards/profiles';
+import {
+  isCardDeclined,
+  makeCreditCardAccount,
+} from '#server/credit-cards/profiles';
 import type { CardSettingsInput } from '#server/credit-cards/profiles';
 import { reconcileCardAccount } from '#server/credit-cards/reconcile';
 import * as db from '#server/db';
@@ -378,7 +381,7 @@ async function linkPluggyAiAccount({
     });
   }
 
-  if (externalAccount.kind === 'credit_card') {
+  if (externalAccount.kind === 'credit_card' && !(await isCardDeclined(id))) {
     await makeCreditCardAccount(id);
   }
 

@@ -870,7 +870,8 @@ class AccountInternal extends PureComponent<
       | 'toggle-net-worth-chart'
       | 'manage-columns'
       | 'account-group'
-      | 'make-credit-card',
+      | 'make-credit-card'
+      | 'revert-credit-card',
   ) => {
     const accountId = this.props.accountId!;
     const account = this.props.accounts.find(
@@ -911,6 +912,9 @@ class AccountInternal extends PureComponent<
         break;
       case 'make-credit-card':
         await send('credit-card-make', { accountId });
+        break;
+      case 'revert-credit-card':
+        await send('credit-card-revert', { accountId });
         break;
       case 'account-group':
         this.props.dispatch(

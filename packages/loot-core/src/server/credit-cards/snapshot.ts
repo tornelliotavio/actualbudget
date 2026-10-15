@@ -10,7 +10,7 @@ import type {
 
 import { createBillCalendar } from './engine/bill-calendar';
 import { billRowId } from './engine/ids';
-import { makeCreditCardAccount } from './profiles';
+import { isCardDeclined, makeCreditCardAccount } from './profiles';
 import { billOverrides, resolveSchedule } from './schedule';
 
 /** Card data the sync server sends next to the transactions. */
@@ -102,12 +102,16 @@ function referenceMonthFor(
 
 /**
  * Stores what the bank reported about a card: billing days, limits and
- * bills. User overrides live in other columns and are never touched.
+ * bills. User overrides live in other columns and are never touched. An
+ * account the user turned back into a regular one stays regular.
  */
 export async function applyCardSnapshot(
   accountId: AccountEntity['id'],
   snapshot: ProviderCardSnapshot,
 ): Promise<void> {
+  if (await isCardDeclined(accountId)) {
+    return;
+  }
   await makeCreditCardAccount(accountId);
 
   const latestBill = [...snapshot.bills]

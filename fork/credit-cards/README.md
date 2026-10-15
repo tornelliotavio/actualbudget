@@ -73,6 +73,15 @@ or that Pluggy operation type), become one transfer when each is the only
 candidate for the other. A bank copy of a transfer entered by hand or posted
 by a schedule replaces that transfer.
 
+**Turning a card back into a regular account** (account menu,
+`credit-card-revert`, `revert.ts`). Projected installments and finance charge
+adjustments are removed the way reconciliation removes them, so they come back
+if the account becomes a card again; every other transaction loses its bill,
+installment data and budget date. The card profile is tombstoned, which marks
+the account as declined: bank sync and linking no longer turn it into a card,
+and turning it into a card by hand revives the profile with the user's
+settings.
+
 **Budget.** Card charges count in the month their bill is due
 (`transactions.budget_date`); everything else in the month of its date. The
 category drill-down from the budget filters by budget month.
@@ -135,6 +144,8 @@ objects; the sync server keeps them as ISO strings so `purchaseDate` survives.
 - The card account page: one bill at a time with its total, projected
   installments, payments, dates, status and the limit used; the register can
   list only that bill's transactions. Mobile shows the same panel.
+- The account menu: turn an account into a credit card, or a card back into a
+  regular account.
 - The selection menu of card transactions: move to the previous or next bill,
   back to automatic, stop or resume projected installments.
 - Card settings: closing and due days, closing-day purchases, limit, bill
