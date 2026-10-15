@@ -149,9 +149,17 @@ objects; the sync server keeps them as ISO strings so `purchaseDate` survives.
 
 ## Where it shows
 
-- The card account page: one bill at a time with its total, projected
-  installments, payments, dates, status and the limit used; the register can
-  list only that bill's transactions. Mobile shows the same panel.
+- The card account page (`CardBillPanel`): one bill at a time with its status,
+  total and how it compares with the average of the complete, settled bills
+  before it (`billTrend.ts`; an open bill shows its share of that average). A
+  bar splits an open bill into what is already on the card and projected
+  installments, or a closed one into paid and left to pay. A track runs from
+  the cycle's first day to the due date, marking the closing date and today.
+  A chart puts the bill beside the ones around it (mostly earlier ones, plus
+  up to two later ones), with projected installments stacked on top and the
+  average dashed; clicking a bar selects that bill. Also the limit used; the
+  register can list only that bill's transactions. Mobile shows the same
+  panel, stacked.
 - The account menu: turn an account into a credit card, or a card back into a
   regular account.
 - The selection menu of card transactions: move to the previous or next bill,
