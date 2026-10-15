@@ -13,7 +13,7 @@ type ChartTooltipProps = {
   rows: Array<{ label: string; value: string; color: string }>;
 };
 
-/** Hover card of the overview charts: one row per series. */
+/** Hover card of a chart: one row per series. */
 export function ChartTooltip({ title, rows }: ChartTooltipProps) {
   return (
     <View

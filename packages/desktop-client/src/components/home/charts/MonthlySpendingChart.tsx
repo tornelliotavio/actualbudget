@@ -30,14 +30,13 @@ import { buildMonthlyTrend } from '#components/home/spending/spendingModel';
 import type { TrendFilter } from '#components/home/spending/spendingModel';
 import { PrivacyFilter } from '#components/PrivacyFilter';
 import { useRechartsAnimation } from '#components/reports/chart-theme';
+import { ChartTooltip } from '#components/reports/ChartTooltip';
 import { Container } from '#components/reports/Container';
 import { getCustomTick } from '#components/reports/getCustomTick';
 import { useFormat } from '#hooks/useFormat';
 import { useLocale } from '#hooks/useLocale';
 import { useLocalPref } from '#hooks/useLocalPref';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
-
-import { ChartTooltip } from './ChartTooltip';
 
 type MonthlySpendingChartProps = {
   rows: readonly BudgetSpendingRow[];

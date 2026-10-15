@@ -23,13 +23,12 @@ import { FinancialText } from '#components/FinancialText';
 import { buildCumulative } from '#components/home/spending/spendingModel';
 import { PrivacyFilter } from '#components/PrivacyFilter';
 import { useRechartsAnimation } from '#components/reports/chart-theme';
+import { ChartTooltip } from '#components/reports/ChartTooltip';
 import { Container } from '#components/reports/Container';
 import { getCustomTick } from '#components/reports/getCustomTick';
 import { useFormat } from '#hooks/useFormat';
 import { useLocale } from '#hooks/useLocale';
 import { usePrivacyMode } from '#hooks/usePrivacyMode';
-
-import { ChartTooltip } from './ChartTooltip';
 
 type CumulativeSpendingChartProps = {
   rows: readonly BudgetDailySpendingRow[];
