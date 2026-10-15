@@ -3,6 +3,14 @@ import type { CardBill } from '@actual-app/core/server/credit-cards/bills';
 
 export type CardBillStatus = CardBill['status'];
 
+/** What is still to pay on a bill: the rest of a closed one, all of an open one. */
+export function amountDue(
+  bill: Pick<CardBill, 'status' | 'remaining' | 'total'>,
+) {
+  const isClosed = bill.status !== 'open' && bill.status !== 'upcoming';
+  return isClosed ? bill.remaining : bill.total;
+}
+
 export function getBillStatusLabel(
   status: CardBillStatus,
   t: (text: string) => string,

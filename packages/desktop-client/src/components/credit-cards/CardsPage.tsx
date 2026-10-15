@@ -4,10 +4,7 @@ import { styles } from '@actual-app/components/styles';
 import { Text } from '@actual-app/components/text';
 import { theme } from '@actual-app/components/theme';
 import { View } from '@actual-app/components/view';
-import type {
-  CardBill,
-  CardBillsResult,
-} from '@actual-app/core/server/credit-cards/bills';
+import type { CardBillsResult } from '@actual-app/core/server/credit-cards/bills';
 import * as monthUtils from '@actual-app/core/shared/months';
 import type { AccountEntity } from '@actual-app/core/types/models';
 
@@ -20,15 +17,13 @@ import { useAllCardBills } from '#hooks/useCardBills';
 import { useFormat } from '#hooks/useFormat';
 import { useLocale } from '#hooks/useLocale';
 
-import { getBillStatusColors, getBillStatusLabel } from './billStatus';
+import {
+  amountDue,
+  getBillStatusColors,
+  getBillStatusLabel,
+} from './billStatus';
 
 const MONTHS_SHOWN = 6;
-
-/** What is still to pay on a bill: the rest of a closed one, all of an open one. */
-function amountDue(bill: CardBill) {
-  const isClosed = bill.status !== 'open' && bill.status !== 'upcoming';
-  return isClosed ? bill.remaining : bill.total;
-}
 
 /**
  * Every credit card's bills side by side for the coming months, with what
