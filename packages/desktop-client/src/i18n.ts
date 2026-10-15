@@ -118,5 +118,6 @@ export const setI18NextLanguage = (language: string | null) => {
     return; // language is already set
   }
 
-  void i18n.changeLanguage(resolved);
+  // Callers that render right after can wait for the translations to load.
+  return i18n.changeLanguage(resolved);
 };

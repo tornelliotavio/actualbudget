@@ -55,7 +55,7 @@ function AppInner() {
   const userData = useSelector(state => state.user.data);
 
   useEffect(() => {
-    setI18NextLanguage(null);
+    void setI18NextLanguage(null);
   }, []);
 
   useEffect(() => {

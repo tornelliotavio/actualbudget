@@ -49,7 +49,7 @@ export function LanguageSettings() {
           }
           onChange={value => {
             setLanguage(value);
-            setI18NextLanguage(value);
+            void setI18NextLanguage(value);
           }}
           disabled={!isEnabled}
         />

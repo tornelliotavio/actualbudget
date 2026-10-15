@@ -58,6 +58,10 @@ export const loadPrefs = createAppAsyncThunk(
       ]);
     } while (savesBeforeLoad !== globalPrefsSaveCount);
 
+    // Translations load before the prefs that open the budget are set, or the
+    // first render keeps showing English.
+    await setI18NextLanguage(globalPrefs.language ?? '');
+
     dispatch(
       setPrefs({ local: prefs, global: globalPrefs, synced: syncedPrefs }),
     );
@@ -69,9 +73,6 @@ export const loadPrefs = createAppAsyncThunk(
         hideFraction: syncedPrefs.hideFraction,
       }),
     );
-
-    // We need to load translations before the app renders
-    setI18NextLanguage(globalPrefs.language ?? '');
 
     return prefs;
   },
