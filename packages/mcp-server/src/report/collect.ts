@@ -135,7 +135,7 @@ function describeAccounts(
       return {
         name: account.name,
         isCard,
-        balance: account.balance,
+        balance: compared,
         bankReported: account.account_sync_source ? account.bankReported : null,
         bankDifference:
           account.account_sync_source && account.bankReported != null

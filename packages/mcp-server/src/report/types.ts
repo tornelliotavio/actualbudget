@@ -48,6 +48,7 @@ export type Receipt = {
 export type ReportAccount = {
   name: string;
   isCard: boolean;
+  /** For a card, with the installments still to come, as banks report it. */
   balance: number;
   /** What the bank reports, when the account is linked to one. */
   bankReported: number | null;
