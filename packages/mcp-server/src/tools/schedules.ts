@@ -26,7 +26,7 @@ type RecurConfig = {
   endMode?: string;
   endDate?: string;
 };
-type Linked = { schedule: string; date: string; amount: number };
+export type Linked = { schedule: string; date: string; amount: number };
 
 const UPCOMING_DAYS = 7;
 // Actual counts a payment against an occurrence from two days before it.
@@ -88,7 +88,7 @@ function describeRecurrence(date: unknown) {
 }
 
 // Schedules link to the parent of a split, which the default inline view hides.
-async function linkedTransactions(): Promise<Linked[]> {
+export async function linkedTransactions(): Promise<Linked[]> {
   const { data } = (await api.aqlQuery(
     api
       .q('transactions')

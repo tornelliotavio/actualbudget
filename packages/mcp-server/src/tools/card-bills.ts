@@ -1,6 +1,8 @@
 import * as api from '@actual-app/api';
 import { z } from 'zod';
 
+import type { Lib } from '#budget';
+
 import type { ToolRegistrar } from './context';
 import { jsonResult, toAmount } from './format';
 
@@ -18,8 +20,15 @@ export type CardBillSummary = {
   complete: boolean;
 };
 
-export function describeCardBill(bill: CardBillSummary) {
+/** Still to pay: what's left of a closed bill, all of one still open. */
+export function cardBillDue(
+  bill: Pick<CardBillSummary, 'status' | 'remaining' | 'total'>,
+) {
   const isClosed = bill.status !== 'open' && bill.status !== 'upcoming';
+  return isClosed ? bill.remaining : bill.total;
+}
+
+export function describeCardBill(bill: CardBillSummary) {
   return {
     month: bill.referenceMonth,
     closing_date: bill.closingDate,
@@ -28,7 +37,7 @@ export function describeCardBill(bill: CardBillSummary) {
     total: toAmount(bill.total),
     projected_installments: toAmount(bill.projectedCharges),
     paid: toAmount(bill.paid),
-    remaining: toAmount(isClosed ? bill.remaining : bill.total),
+    remaining: toAmount(cardBillDue(bill)),
     minimum: bill.minimumPayment == null ? null : toAmount(bill.minimumPayment),
     ...(bill.complete ? {} : { history_incomplete: true }),
   };
@@ -43,6 +52,25 @@ export function selectCardBills<
 >(bills: readonly T[], currentMonth: string | null, count: number): T[] {
   const start = bills.findIndex(bill => bill.referenceMonth === currentMonth);
   return start === -1 ? [] : bills.slice(start, start + count);
+}
+
+/** Every open credit card account with all of its bills, oldest first. */
+export async function loadCards(lib: Lib) {
+  const { data: accounts } = (await api.aqlQuery(
+    api
+      .q('accounts')
+      .filter({ closed: false, kind: 'credit_card' })
+      .select(['id', 'name']),
+  )) as { data: { id: string; name: string }[] };
+
+  const cards = [];
+  for (const account of accounts) {
+    const result = await lib.send('credit-card-bills', {
+      accountId: account.id,
+    });
+    cards.push({ account: account.name, result });
+  }
+  return cards;
 }
 
 export const registerCardBillTools: ToolRegistrar = (server, ctx) => {
@@ -67,21 +95,11 @@ export const registerCardBillTools: ToolRegistrar = (server, ctx) => {
     },
     ({ months = 4 }) =>
       ctx.session.read(async lib => {
-        const { data: accounts } = (await api.aqlQuery(
-          api
-            .q('accounts')
-            .filter({ closed: false, kind: 'credit_card' })
-            .select(['id', 'name']),
-        )) as { data: { id: string; name: string }[] };
-
         const cards = [];
         const dueByMonth = new Map<string, number>();
-        for (const account of accounts) {
-          const result = await lib.send('credit-card-bills', {
-            accountId: account.id,
-          });
+        for (const { account, result } of await loadCards(lib)) {
           if (result.status !== 'ok') {
-            cards.push({ account: account.name, status: result.status });
+            cards.push({ account, status: result.status });
             continue;
           }
           const bills = selectCardBills(
@@ -90,16 +108,13 @@ export const registerCardBillTools: ToolRegistrar = (server, ctx) => {
             months,
           );
           for (const bill of bills) {
-            const isClosed =
-              bill.status !== 'open' && bill.status !== 'upcoming';
-            const due = isClosed ? bill.remaining : bill.total;
             dueByMonth.set(
               bill.referenceMonth,
-              (dueByMonth.get(bill.referenceMonth) ?? 0) + due,
+              (dueByMonth.get(bill.referenceMonth) ?? 0) + cardBillDue(bill),
             );
           }
           cards.push({
-            account: account.name,
+            account,
             limit:
               result.limit.total == null
                 ? null

@@ -7,6 +7,7 @@ import { UNCATEGORIZED_FILTER } from './transactions';
 type AccountRow = {
   id: string;
   name: string;
+  kind: string;
   offbudget: boolean;
   closed: boolean;
   account_sync_source: string | null;
@@ -22,6 +23,38 @@ async function sum(filter: Record<string, unknown>) {
   return data ?? 0;
 }
 
+/** Open accounts with their balances in cents. Load inside a budget session. */
+export async function loadAccountBalances(today: string) {
+  const reported = new Map(
+    (await api.getAccounts()).map(a => [a.id, a.balance_current]),
+  );
+  const { data: accounts } = (await api.aqlQuery(
+    api
+      .q('accounts')
+      .filter({ closed: false })
+      .select([
+        'id',
+        'name',
+        'kind',
+        'offbudget',
+        'closed',
+        'account_sync_source',
+        'last_sync',
+      ]),
+  )) as { data: AccountRow[] };
+
+  const balances = [];
+  for (const account of accounts) {
+    balances.push({
+      ...account,
+      balance: await sum({ account: account.id, date: { $lte: today } }),
+      balanceIncludingFuture: await sum({ account: account.id }),
+      bankReported: reported.get(account.id) ?? null,
+    });
+  }
+  return balances;
+}
+
 export const registerOverviewTools: ToolRegistrar = (server, ctx) => {
   server.registerTool(
     'get_overview',
@@ -35,46 +68,24 @@ export const registerOverviewTools: ToolRegistrar = (server, ctx) => {
     () =>
       ctx.session.read(async () => {
         const today = currentDay();
-        const reported = new Map(
-          (await api.getAccounts()).map(a => [a.id, a.balance_current]),
-        );
-        const { data: accounts } = (await api.aqlQuery(
-          api
-            .q('accounts')
-            .filter({ closed: false })
-            .select([
-              'id',
-              'name',
-              'offbudget',
-              'closed',
-              'account_sync_source',
-              'last_sync',
-            ]),
-        )) as { data: AccountRow[] };
-
-        const balances = [];
-        for (const account of accounts) {
-          const bank = reported.get(account.id);
-          balances.push({
-            account: account.name,
-            ...(account.offbudget ? { off_budget: true } : {}),
-            balance: toAmount(
-              await sum({ account: account.id, date: { $lte: today } }),
-            ),
-            balance_including_future: toAmount(
-              await sum({ account: account.id }),
-            ),
-            ...(bank != null ? { bank_reported: toAmount(bank) } : {}),
-            ...(account.account_sync_source
-              ? {
-                  bank_sync: account.account_sync_source,
-                  last_bank_sync: account.last_sync
-                    ? new Date(Number(account.last_sync)).toISOString()
-                    : null,
-                }
-              : {}),
-          });
-        }
+        const accounts = await loadAccountBalances(today);
+        const balances = accounts.map(account => ({
+          account: account.name,
+          ...(account.offbudget ? { off_budget: true } : {}),
+          balance: toAmount(account.balance),
+          balance_including_future: toAmount(account.balanceIncludingFuture),
+          ...(account.bankReported != null
+            ? { bank_reported: toAmount(account.bankReported) }
+            : {}),
+          ...(account.account_sync_source
+            ? {
+                bank_sync: account.account_sync_source,
+                last_bank_sync: account.last_sync
+                  ? new Date(Number(account.last_sync)).toISOString()
+                  : null,
+              }
+            : {}),
+        }));
 
         const since = addDays(today, -UNCATEGORIZED_WINDOW_DAYS);
         const { data: uncategorized } = (await api.aqlQuery(
