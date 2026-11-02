@@ -1,5 +1,17 @@
 import path from 'path';
 
+export type ReportEmailConfig =
+  | {
+      kind: 'smtp';
+      host: string;
+      port: number;
+      user: string;
+      password: string;
+      from: string;
+      to: string[];
+    }
+  | { kind: 'resend'; apiKey: string; from: string; to: string[] };
+
 export type ServerConfig = {
   port: number;
   publicUrl: URL;
@@ -22,11 +34,11 @@ export type ServerConfig = {
   };
   report: {
     ignoredCategories: string[];
-    email: { apiKey: string; from: string; to: string[] } | null;
+    email: ReportEmailConfig | null;
   };
 };
 
-const DEFAULT_REPORT_FROM = 'Actual <onboarding@resend.dev>';
+const DEFAULT_RESEND_FROM = 'Actual <onboarding@resend.dev>';
 const DEFAULT_IGNORED_CATEGORIES = [
   'Movimentações internas',
   'Starting Balances',
@@ -78,11 +90,33 @@ function list(env: NodeJS.ProcessEnv, name: string): string[] | undefined {
     .filter(Boolean);
 }
 
+function reportEmail(env: NodeJS.ProcessEnv): ReportEmailConfig | null {
+  const to = list(env, 'REPORT_EMAIL_TO');
+  if (!to) return null;
+
+  const from = env.REPORT_EMAIL_FROM?.trim();
+  const host = env.SMTP_HOST?.trim();
+  if (host) {
+    const user = required(env, 'SMTP_USER');
+    return {
+      kind: 'smtp',
+      host,
+      port: integer(env, 'SMTP_PORT', 465, { min: 1, max: 65535 }),
+      user,
+      password: required(env, 'SMTP_PASSWORD'),
+      from: from || `Actual <${user}>`,
+      to,
+    };
+  }
+
+  const apiKey = env.RESEND_API_KEY?.trim();
+  if (!apiKey) return null;
+  return { kind: 'resend', apiKey, from: from || DEFAULT_RESEND_FROM, to };
+}
+
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const port = integer(env, 'PORT', 5007, { min: 1, max: 65535 });
   const actualPassword = required(env, 'ACTUAL_PASSWORD');
-  const resendApiKey = env.RESEND_API_KEY?.trim();
-  const reportRecipients = list(env, 'REPORT_EMAIL_TO');
 
   return {
     port,
@@ -114,14 +148,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     report: {
       ignoredCategories:
         list(env, 'REPORT_IGNORED_CATEGORIES') ?? DEFAULT_IGNORED_CATEGORIES,
-      email:
-        resendApiKey && reportRecipients
-          ? {
-              apiKey: resendApiKey,
-              from: env.REPORT_EMAIL_FROM?.trim() || DEFAULT_REPORT_FROM,
-              to: reportRecipients,
-            }
-          : null,
+      email: reportEmail(env),
     },
   };
 }

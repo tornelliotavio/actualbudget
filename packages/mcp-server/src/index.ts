@@ -10,7 +10,8 @@ import { createBudgetSession } from '#budget';
 import { loadConfig } from '#config';
 import { createHttpApp } from '#http';
 import { startDailyJob } from '#jobs';
-import { createResendMailer } from '#report/mailer';
+import { createResendMailer } from '#report/resend';
+import { createSmtpMailer } from '#report/smtp';
 import { createMcpServer } from '#server';
 
 function log(message: string) {
@@ -59,8 +60,16 @@ const dailyJob = config.dailyJob.enabled
     })
   : null;
 
+function createReportMailer() {
+  const { email } = config.report;
+  if (!email) return null;
+  return email.kind === 'smtp'
+    ? createSmtpMailer(email)
+    : createResendMailer(email);
+}
+
 const report = {
-  mailer: config.report.email ? createResendMailer(config.report.email) : null,
+  mailer: createReportMailer(),
   ignoredCategories: config.report.ignoredCategories,
 };
 

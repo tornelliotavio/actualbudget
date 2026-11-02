@@ -185,9 +185,11 @@ __metadata:
     "@modelcontextprotocol/sdk": "npm:1.30.1"
     "@types/express": "npm:^5.0.6"
     "@types/node": "npm:^22.20.1"
+    "@types/nodemailer": "npm:8.0.2"
     "@types/pdfkit": "npm:0.17.7"
     "@typescript/native-preview": "npm:beta"
     express: "npm:^5.2.1"
+    nodemailer: "npm:10.3.1"
     pdfkit: "npm:0.20.2"
     vite: "npm:^8.1.5"
     vitest: "npm:^5.0.0"
@@ -9186,6 +9188,15 @@ __metadata:
   dependencies:
     undici-types: "npm:~7.16.0"
   checksum: 10/4e5ce6faaf0e6f291114d6ac14fe546d491812b306107620802d5bef00ca36fb290637e79ec4fc24f33214f78f58c9b63254bd0ce94788bebfec03f26d45f2ea
+  languageName: node
+  linkType: hard
+
+"@types/nodemailer@npm:8.0.2":
+  version: 8.0.2
+  resolution: "@types/nodemailer@npm:8.0.2"
+  dependencies:
+    "@types/node": "npm:*"
+  checksum: 10/e9a5df9af188d4f64666fc4fcff62159bbfcd050b7ec7ed539bf6acf9bdd180571bcd5fc19dce5b31b71cde9ff5ae82a2c68533651ddca56b3fbe5bd67668c9f
   languageName: node
   linkType: hard
 
@@ -20801,6 +20812,13 @@ __metadata:
     util: "npm:^0.12.4"
     vm-browserify: "npm:^1.0.1"
   checksum: 10/5d5ace50868ef1a8ce9718a5fc64e4b6712f8be75bf6ab71f2eb7b5815f55f20507e427eac2fdb384e372f58891eb34089af3b55d3f9b5b60b547c8581a1c30e
+  languageName: node
+  linkType: hard
+
+"nodemailer@npm:10.3.1":
+  version: 10.3.1
+  resolution: "nodemailer@npm:10.3.1"
+  checksum: 10/5193882b528ec334d239162d73e5fefc42083c85e95604e8688d10a58fca813843ac6f92cc6f62574602a2ac2e894e4186b24da0e00552d624ce887ccc6b7759
   languageName: node
   linkType: hard
 

@@ -84,25 +84,38 @@ export const registerReportDeliveryTools: ToolRegistrar = (server, ctx) => {
         return jsonResult({
           sent: false,
           reason:
-            'Email is not configured: set RESEND_API_KEY and REPORT_EMAIL_TO on the actual-mcp service.',
+            'Email is not configured: set SMTP_HOST, SMTP_USER, SMTP_PASSWORD and REPORT_EMAIL_TO on the actual-mcp service.',
           totals: describeTotals(report),
         });
       }
 
-      const { id } = await ctx.report.mailer.send(
-        composeReportEmail(report, pdf),
-      );
-      ctx.audit.record({
-        tool: 'send_daily_report',
-        summary: `Emailed the report of ${report.today}`,
-        details: { id, recipients: ctx.report.mailer.recipients.length },
-      });
-      return jsonResult({
-        sent: true,
-        email_id: id,
-        pdf_bytes: pdf.length,
-        totals: describeTotals(report),
-      });
+      try {
+        const { id } = await ctx.report.mailer.send(
+          composeReportEmail(report, pdf),
+        );
+        ctx.audit.record({
+          tool: 'send_daily_report',
+          summary: `Emailed the report of ${report.today}`,
+          details: { id, recipients: ctx.report.mailer.recipients.length },
+        });
+        return jsonResult({
+          sent: true,
+          email_id: id,
+          pdf_bytes: pdf.length,
+          totals: describeTotals(report),
+        });
+      } catch (error) {
+        const reason = error instanceof Error ? error.message : String(error);
+        ctx.audit.record({
+          tool: 'send_daily_report',
+          summary: `Could not email the report of ${report.today}: ${reason}`,
+        });
+        return jsonResult({
+          sent: false,
+          reason,
+          totals: describeTotals(report),
+        });
+      }
     },
   );
 };

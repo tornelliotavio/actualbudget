@@ -1,6 +1,10 @@
+import { loadConfig } from '#config';
+
 import { composeReportEmail } from './email';
-import { createResendMailer } from './mailer';
 import { renderReportPdf } from './pdf';
+import { createResendMailer } from './resend';
+import { createSmtpMailer } from './smtp';
+import type { SmtpOptions } from './smtp';
 import type { DailyReport } from './types';
 
 const report: DailyReport = {
@@ -202,5 +206,109 @@ describe('createResendMailer', () => {
       'Resend answered 403: Domain not verified',
     );
     await expect(mailer.send(message)).rejects.not.toThrow('secret-key');
+  });
+});
+
+describe('createSmtpMailer', () => {
+  const options: SmtpOptions = {
+    host: 'smtp.example.com',
+    port: 465,
+    user: 'actual@example.com',
+    password: 'secret-password',
+    from: 'Actual <actual@example.com>',
+    to: ['owner@example.com'],
+  };
+  const message = {
+    subject: 'Assunto',
+    html: '<p>Oi</p>',
+    text: 'Oi',
+    attachments: [{ filename: 'a.pdf', content: Buffer.from('pdf') }],
+  };
+
+  it('sends with the configured sender and recipients', async () => {
+    const sendMail = vi.fn(async () => ({ messageId: '<id@example.com>' }));
+    const mailer = createSmtpMailer(options, { sendMail });
+
+    await expect(mailer.send(message)).resolves.toEqual({
+      id: '<id@example.com>',
+    });
+    expect(sendMail).toHaveBeenCalledWith({
+      from: 'Actual <actual@example.com>',
+      to: ['owner@example.com'],
+      ...message,
+    });
+  });
+
+  it('explains an unreachable server', async () => {
+    const failure = Object.assign(new Error('timeout'), { code: 'ETIMEDOUT' });
+    const mailer = createSmtpMailer(options, {
+      sendMail: async () => Promise.reject(failure),
+    });
+
+    await expect(mailer.send(message)).rejects.toThrow(
+      'Could not reach smtp.example.com:465 (ETIMEDOUT)',
+    );
+  });
+
+  it('explains a refused login without the password', async () => {
+    const failure = Object.assign(new Error('Invalid login'), {
+      code: 'EAUTH',
+    });
+    const mailer = createSmtpMailer(options, {
+      sendMail: async () => Promise.reject(failure),
+    });
+
+    const error = await mailer.send(message).catch(e => e as Error);
+    expect(String(error)).toContain('refused the login for actual@example.com');
+    expect(String(error)).not.toContain('secret-password');
+  });
+});
+
+describe('report email configuration', () => {
+  const base = { ACTUAL_PASSWORD: 'x', ACTUAL_SERVER_URL: 'http://localhost' };
+  const smtp = {
+    SMTP_HOST: 'smtp.example.com',
+    SMTP_USER: 'actual@example.com',
+    SMTP_PASSWORD: 'secret',
+    REPORT_EMAIL_TO: 'a@example.com, b@example.com',
+  };
+
+  it('is off without a provider or a recipient', () => {
+    expect(loadConfig(base).report.email).toBeNull();
+    expect(
+      loadConfig({ ...base, ...smtp, REPORT_EMAIL_TO: '' }).report.email,
+    ).toBeNull();
+  });
+
+  it('sends from the SMTP account by default, over TLS', () => {
+    expect(loadConfig({ ...base, ...smtp }).report.email).toEqual({
+      kind: 'smtp',
+      host: 'smtp.example.com',
+      port: 465,
+      user: 'actual@example.com',
+      password: 'secret',
+      from: 'Actual <actual@example.com>',
+      to: ['a@example.com', 'b@example.com'],
+    });
+  });
+
+  it('prefers SMTP over Resend', () => {
+    const email = loadConfig({ ...base, ...smtp, RESEND_API_KEY: 'key' }).report
+      .email;
+    expect(email?.kind).toBe('smtp');
+  });
+
+  it('falls back to Resend', () => {
+    const email = loadConfig({
+      ...base,
+      RESEND_API_KEY: 'key',
+      REPORT_EMAIL_TO: 'a@example.com',
+    }).report.email;
+    expect(email).toEqual({
+      kind: 'resend',
+      apiKey: 'key',
+      from: 'Actual <onboarding@resend.dev>',
+      to: ['a@example.com'],
+    });
   });
 });
