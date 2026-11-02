@@ -77,6 +77,10 @@ export const registerReportDeliveryTools: ToolRegistrar = (server, ctx) => {
         return jsonResult({ sent: false, pdf_bytes: pdf.length, report });
       }
       if (!ctx.report.mailer) {
+        ctx.audit.record({
+          tool: 'send_daily_report',
+          summary: `Built the report of ${report.today}; email is not configured`,
+        });
         return jsonResult({
           sent: false,
           reason:
