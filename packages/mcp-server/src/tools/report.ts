@@ -64,12 +64,15 @@ export const registerReportDeliveryTools: ToolRegistrar = (server, ctx) => {
       annotations: { openWorldHint: true },
     },
     async ({ summary, corrections = [], questions = [], dry_run }) => {
-      const data = await ctx.session.read(lib =>
-        collectReport(lib, {
+      const data = await ctx.session.write(async lib => {
+        // Only the app's sync advances a paid schedule to its next date, and
+        // a schedule stuck on a paid date would hide this month's bill.
+        await lib.send('schedule/force-run-service');
+        return collectReport(lib, {
           today: currentDay(),
           ignoredCategories: ctx.report.ignoredCategories,
-        }),
-      );
+        });
+      });
       const report = { ...data, notes: { summary, corrections, questions } };
       const pdf = await renderReportPdf(report);
 

@@ -199,6 +199,10 @@ Set these on `actual-mcp` in the dashboard (see
 `get_change_history` shows each report: emailed, not configured, or the reason
 it failed.
 
+The tool runs `schedule/force-run-service` first. Linking a payment leaves a
+schedule on the date it paid until something advances it, normally the app's
+sync, and until then the month's next occurrence wouldn't count as a bill.
+
 ### Connecting clients
 
 - **claude.ai** (then mobile and desktop too): Settings → Connectors → Add
