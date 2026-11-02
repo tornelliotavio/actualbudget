@@ -68,6 +68,7 @@ const CARD_STATUS_DOTS: Record<string, string> = {
 };
 
 type FontName = 'regular' | 'medium' | 'semibold' | 'bold';
+type FontFeature = NonNullable<PDFKit.Mixins.TextOptions['features']>[number];
 type Align = 'left' | 'right';
 type Style = {
   font?: FontName;
@@ -105,15 +106,16 @@ function createCanvas(doc: PDFKit.PDFDocument) {
     doc.font(font).fontSize(size).fillColor(color);
   }
 
-  function fit(text: string, width: number) {
-    if (doc.widthOfString(text) <= width) return text;
+  function fit(text: string, width: number, features: FontFeature[]) {
+    if (doc.widthOfString(text, { features }) <= width) return text;
     let kept = text;
-    while (kept && doc.widthOfString(`${kept}…`) > width) {
+    while (kept && doc.widthOfString(`${kept}…`, { features }) > width) {
       kept = kept.slice(0, -1);
     }
     return `${kept.trimEnd()}…`;
   }
 
+  /** Placed by hand: pdfkit wraps any text it's given a width for. */
   function line(
     text: string,
     x: number,
@@ -122,13 +124,13 @@ function createCanvas(doc: PDFKit.PDFDocument) {
     style: Style,
   ) {
     apply(style);
-    const clean = printable(text);
-    doc.text(fit(clean, width), x, top, {
-      width,
-      align: style.align ?? 'left',
-      lineBreak: false,
-      features: style.tabular ? ['tnum'] : [],
-    });
+    const features: FontFeature[] = style.tabular ? ['tnum'] : [];
+    const fitted = fit(printable(text), width, features);
+    const left =
+      style.align === 'right'
+        ? x + width - doc.widthOfString(fitted, { features })
+        : x;
+    doc.text(fitted, left, top, { lineBreak: false, features });
   }
 
   function paragraph(text: string, x: number, width: number, style: Style) {
@@ -457,7 +459,6 @@ function drawPendingBills(canvas: Canvas, report: DailyReport) {
 function cardCells(card: ReportCard): Cell[] {
   return [
     card.name.replace(/^Cartão\s+/i, ''),
-    formatShortMonth(card.referenceMonth),
     formatDay(card.dueDate),
     {
       text: CARD_STATUS_LABELS[card.status] ?? card.status,
@@ -480,25 +481,15 @@ function drawCards(canvas: Canvas, report: DailyReport) {
   );
   canvas.table(
     [
-      { width: 90 },
-      { width: 52 },
-      { width: 44 },
-      { width: 72 },
-      { width: 68, align: 'right' },
-      { width: 58, align: 'right' },
-      { width: 68, align: 'right' },
-      { width: 55.28 },
+      { width: 92 },
+      { width: 42 },
+      { width: 76 },
+      { width: 80, align: 'right' },
+      { width: 80, align: 'right' },
+      { width: 80, align: 'right' },
+      { width: 57.28 },
     ],
-    [
-      'Cartão',
-      'Fatura',
-      'Vence',
-      'Situação',
-      'Total',
-      'Pago',
-      'Falta',
-      'Limite',
-    ],
+    ['Cartão', 'Vence', 'Situação', 'Total', 'Pago', 'Falta', 'Limite'],
     report.cards.map(cardCells),
   );
   if (report.dueByMonth.length > 0) {
