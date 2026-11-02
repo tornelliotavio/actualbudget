@@ -177,6 +177,26 @@ server so its API always matches the budget's migrations.
 Secrets are typed into the dashboard rather than set by an agent, so they never
 pass through a transcript.
 
+### Daily report by email
+
+A scheduled Claude task cleans up the budget every morning, after the 06:00
+daily job, and ends by calling the connector's `send_daily_report` tool. The PDF
+is built and sent here, on `actual-mcp`, because the scheduled task's cloud
+environment can't reach email providers. Railway blocks outbound SMTP below the
+Pro plan, so sending goes through Resend's HTTPS API.
+
+Set these on `actual-mcp` in the dashboard (see
+`packages/mcp-server/README.md`):
+
+| Variable            | Value                                                                    |
+| ------------------- | ------------------------------------------------------------------------ |
+| `RESEND_API_KEY`    | _secret_, from the Resend dashboard                                      |
+| `REPORT_EMAIL_TO`   | The owner's address                                                      |
+| `REPORT_EMAIL_FROM` | Only with a domain verified in Resend, e.g. `Actual <actual@domain.com>` |
+
+Without a verified domain, the default sender only delivers to the address the
+Resend account was created with.
+
 ### Connecting clients
 
 - **claude.ai** (then mobile and desktop too): Settings → Connectors → Add

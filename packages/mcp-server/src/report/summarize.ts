@@ -1,0 +1,239 @@
+import { amountRange, scheduleStatus } from '#tools/schedules';
+
+import { daysUntil } from './format';
+import type {
+  IncomeLine,
+  PendingBill,
+  Receipt,
+  ReportBillStatus,
+  SpendingGroup,
+  SpendingLine,
+} from './types';
+
+const SOON_DAYS = 7;
+
+export type ScheduleInput = {
+  name: string;
+  nextDate: string;
+  completed: boolean;
+  amount: unknown;
+  amountOp: string | undefined;
+  paidDates: string[];
+};
+
+export type CardBillInput = {
+  card: string;
+  referenceMonth: string;
+  dueDate: string;
+  status: string;
+  due: number;
+};
+
+export type CategoryInput = { id: string; name: string; group: string };
+export type GroupInput = { id: string; name: string; isIncome: boolean };
+
+export type SpendingRow = {
+  month: string;
+  category: string | null;
+  amount: number;
+};
+
+export type SpendingSummary = {
+  spending: SpendingGroup[];
+  income: IncomeLine[];
+  totals: {
+    spent: number;
+    previousSpent: number;
+    received: number;
+    previousReceived: number;
+  };
+};
+
+function middle(amount: unknown, op: string | undefined) {
+  const { min, max } = amountRange(amount, op);
+  return op === 'isbetween' ? Math.round((min + max) / 2) : Number(amount ?? 0);
+}
+
+function statusByDate(dueDate: string, today: string): ReportBillStatus {
+  if (dueDate < today) return 'overdue';
+  if (dueDate === today) return 'due';
+  return daysUntil(today, dueDate) <= SOON_DAYS ? 'upcoming' : 'scheduled';
+}
+
+/** Recurring bills unpaid up to the end of the month, older misses included. */
+export function pendingSchedules(
+  schedules: readonly ScheduleInput[],
+  today: string,
+  monthEnd: string,
+): PendingBill[] {
+  return schedules.flatMap(schedule => {
+    const amount = middle(schedule.amount, schedule.amountOp);
+    const status = scheduleStatus(
+      schedule.nextDate,
+      schedule.completed,
+      schedule.paidDates,
+      today,
+    );
+    if (
+      amount >= 0 ||
+      schedule.nextDate > monthEnd ||
+      status === 'paid' ||
+      status === 'completed'
+    ) {
+      return [];
+    }
+    return [
+      {
+        name: schedule.name,
+        dueDate: schedule.nextDate,
+        amount: -amount,
+        kind: 'schedule' as const,
+        isEstimate: schedule.amountOp !== 'is',
+        status: statusByDate(schedule.nextDate, today),
+      },
+    ];
+  });
+}
+
+/** Card bills unpaid up to the end of the month. */
+export function pendingCardBills(
+  bills: readonly CardBillInput[],
+  today: string,
+  monthEnd: string,
+): PendingBill[] {
+  return bills
+    .filter(bill => bill.due > 0 && bill.dueDate <= monthEnd)
+    .map(bill => {
+      const byDate = statusByDate(bill.dueDate, today);
+      const isOpen = bill.status === 'open' || bill.status === 'upcoming';
+      return {
+        name: `Fatura ${bill.card}`,
+        dueDate: bill.dueDate,
+        amount: bill.due,
+        kind: 'card' as const,
+        isEstimate: false,
+        status: isOpen && byDate !== 'overdue' ? 'open' : byDate,
+      };
+    });
+}
+
+export function sortPendingBills(bills: readonly PendingBill[]) {
+  return [...bills].sort(
+    (a, b) => a.dueDate.localeCompare(b.dueDate) || b.amount - a.amount,
+  );
+}
+
+function byLargest<T extends { total: number }>(a: T, b: T) {
+  return b.total - a.total;
+}
+
+function sumLines(name: string, lines: readonly SpendingLine[]): SpendingLine {
+  return {
+    name,
+    total: lines.reduce((sum, l) => sum + l.total, 0),
+    previous: lines.reduce((sum, l) => sum + l.previous, 0),
+  };
+}
+
+/**
+ * Spending per group and category in `month`, income apart, with a line for
+ * what has no category yet. `ignored` categories count as neither; money in
+ * without a category isn't spending.
+ */
+export function summarizeSpending({
+  rows,
+  categories,
+  groups,
+  ignored,
+  month,
+  previousMonth,
+}: {
+  rows: readonly SpendingRow[];
+  categories: readonly CategoryInput[];
+  groups: readonly GroupInput[];
+  ignored: readonly string[];
+  month: string;
+  previousMonth: string;
+}): SpendingSummary {
+  const amount = (category: string | null, wanted: string) =>
+    rows
+      .filter(row => row.category === category && row.month === wanted)
+      .reduce((sum, row) => sum + row.amount, 0);
+  const incomeLine = (category: CategoryInput): IncomeLine => ({
+    name: category.name,
+    total: amount(category.id, month),
+    previous: amount(category.id, previousMonth),
+  });
+  // Subtracting from zero keeps an empty category at 0 rather than -0.
+  const spendingLine = (category: CategoryInput): SpendingLine => ({
+    name: category.name,
+    total: 0 - amount(category.id, month),
+    previous: 0 - amount(category.id, previousMonth),
+  });
+  const isIncome = new Set(groups.filter(g => g.isIncome).map(g => g.id));
+  const skipped = new Set(ignored.map(name => name.toLocaleLowerCase()));
+
+  const counted = categories.filter(
+    c => !skipped.has(c.name.toLocaleLowerCase()),
+  );
+  const expenses = counted.filter(c => !isIncome.has(c.group));
+  const incomes = counted.filter(c => isIncome.has(c.group)).map(incomeLine);
+
+  const spending = groups
+    .filter(group => !group.isIncome)
+    .flatMap((group): SpendingGroup[] => {
+      const lines = expenses
+        .filter(category => category.group === group.id)
+        .map(spendingLine);
+      const shown = lines.filter(l => l.total !== 0).sort(byLargest);
+      if (shown.length === 0) return [];
+      return [{ ...sumLines(group.name, lines), categories: shown }];
+    });
+
+  const unknown = {
+    name: 'Sem categoria',
+    total: 0 - Math.min(amount(null, month), 0),
+    previous: 0 - Math.min(amount(null, previousMonth), 0),
+  };
+  if (unknown.total > 0) {
+    spending.push({ ...unknown, categories: [] });
+  }
+
+  const spent = sumLines('', [...expenses.map(spendingLine), unknown]);
+  const received = sumLines('', incomes);
+  return {
+    spending: spending.sort(byLargest),
+    income: incomes.filter(l => l.total !== 0).sort(byLargest),
+    totals: {
+      spent: spent.total,
+      previousSpent: spent.previous,
+      received: received.total,
+      previousReceived: received.previous,
+    },
+  };
+}
+
+/** Pix keys and tax ids make poor names; the bank description has the person. */
+export function receiptLabel(payee: string | null, notes: string | null) {
+  if (payee && !/^[\d./-]+$/.test(payee)) return payee;
+  return (
+    (notes ?? '')
+      .replace(/^pix recebido\s*-?\s*/i, '')
+      .replace(/\s+/g, ' ')
+      .trim() || 'Sem descrição'
+  );
+}
+
+export function limitReceipts(receipts: readonly Receipt[], limit: number) {
+  const sorted = [...receipts].sort(
+    (a, b) => b.amount - a.amount || b.date.localeCompare(a.date),
+  );
+  const rest = sorted.slice(limit);
+  return {
+    receipts: sorted.slice(0, limit),
+    otherReceipts: {
+      count: rest.length,
+      amount: rest.reduce((sum, receipt) => sum + receipt.amount, 0),
+    },
+  };
+}

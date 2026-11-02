@@ -10,6 +10,7 @@ import { createBudgetSession } from '#budget';
 import { loadConfig } from '#config';
 import { createHttpApp } from '#http';
 import { startDailyJob } from '#jobs';
+import { createResendMailer } from '#report/mailer';
 import { createMcpServer } from '#server';
 
 function log(message: string) {
@@ -58,12 +59,17 @@ const dailyJob = config.dailyJob.enabled
     })
   : null;
 
+const report = {
+  mailer: config.report.email ? createResendMailer(config.report.email) : null,
+  ignoredCategories: config.report.ignoredCategories,
+};
+
 const app = createHttpApp({
   publicUrl: config.publicUrl,
   provider,
   createServer: () =>
     createMcpServer(
-      { session, audit, lastDailyJob: () => dailyJob?.last() ?? null },
+      { session, audit, lastDailyJob: () => dailyJob?.last() ?? null, report },
       version,
     ),
   log,

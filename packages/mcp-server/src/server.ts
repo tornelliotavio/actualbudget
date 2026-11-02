@@ -9,6 +9,7 @@ import { registerHistoryTools } from './tools/history';
 import { registerNotebookTools } from './tools/notebook';
 import { registerOverviewTools } from './tools/overview';
 import { registerPayeeTools } from './tools/payees';
+import { registerReportDeliveryTools } from './tools/report';
 import { registerReportTools } from './tools/reports';
 import { registerRuleTools } from './tools/rules';
 import { registerScheduleTools } from './tools/schedules';
@@ -34,6 +35,7 @@ const REGISTRARS: ToolRegistrar[] = [
   registerBudgetTools,
   registerPayeeTools,
   registerReportTools,
+  registerReportDeliveryTools,
   registerSyncTools,
   registerCardBillTools,
   registerHistoryTools,

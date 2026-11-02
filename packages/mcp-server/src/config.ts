@@ -20,7 +20,17 @@ export type ServerConfig = {
     hour: number;
     bankSync: boolean;
   };
+  report: {
+    ignoredCategories: string[];
+    email: { apiKey: string; from: string; to: string[] } | null;
+  };
 };
+
+const DEFAULT_REPORT_FROM = 'Actual <onboarding@resend.dev>';
+const DEFAULT_IGNORED_CATEGORIES = [
+  'Movimentações internas',
+  'Starting Balances',
+];
 
 const DEFAULT_REDIRECT_URIS = [
   'https://claude.ai/api/mcp/auth_callback',
@@ -71,6 +81,8 @@ function list(env: NodeJS.ProcessEnv, name: string): string[] | undefined {
 export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
   const port = integer(env, 'PORT', 5007, { min: 1, max: 65535 });
   const actualPassword = required(env, 'ACTUAL_PASSWORD');
+  const resendApiKey = env.RESEND_API_KEY?.trim();
+  const reportRecipients = list(env, 'REPORT_EMAIL_TO');
 
   return {
     port,
@@ -98,6 +110,18 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
       enabled: boolean(env, 'MCP_DAILY_JOB', true),
       hour: integer(env, 'MCP_DAILY_JOB_HOUR', 6, { min: 0, max: 23 }),
       bankSync: boolean(env, 'MCP_DAILY_BANK_SYNC', true),
+    },
+    report: {
+      ignoredCategories:
+        list(env, 'REPORT_IGNORED_CATEGORIES') ?? DEFAULT_IGNORED_CATEGORIES,
+      email:
+        resendApiKey && reportRecipients
+          ? {
+              apiKey: resendApiKey,
+              from: env.REPORT_EMAIL_FROM?.trim() || DEFAULT_REPORT_FROM,
+              to: reportRecipients,
+            }
+          : null,
     },
   };
 }

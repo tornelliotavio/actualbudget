@@ -29,6 +29,20 @@ Signing in asks for a single password on a page this server renders.
 | `MCP_DAILY_JOB_HOUR`        |          | Local hour it runs at (set `TZ`). Defaults to `6`.                                                                                                                                    |
 | `MCP_DAILY_BANK_SYNC`       |          | Include bank sync in the daily job. Defaults to `true`.                                                                                                                               |
 | `MCP_BACKUP_RETENTION`      |          | Backups kept. Defaults to `14`.                                                                                                                                                       |
+| `RESEND_API_KEY`            |          | [Resend](https://resend.com) key for `send_daily_report`. Without it, or without `REPORT_EMAIL_TO`, the tool reports that email isn't configured.                                     |
+| `REPORT_EMAIL_TO`           |          | Comma-separated recipients of the report. Fixed here so that no tool call can send the budget anywhere else.                                                                          |
+| `REPORT_EMAIL_FROM`         |          | Sender. Defaults to `Actual <onboarding@resend.dev>`, which only reaches the Resend account's own address; other recipients need a verified domain.                                   |
+| `REPORT_IGNORED_CATEGORIES` |          | Comma-separated categories the report treats as neither spending nor income. Defaults to `Movimentações internas,Starting Balances`.                                                  |
+
+## Daily report
+
+`send_daily_report` builds a PDF and emails it through Resend's HTTPS API:
+spending by category, what was received, bills and card bills left to pay this
+month, and account balances. The numbers are computed here, from the budget,
+with the rules of the app's overview (`fork/home/README.md`), so they match what
+the app shows. The caller only adds what happened today: a summary, the
+corrections made and the questions for the owner. `dry_run` returns the data
+without sending anything.
 
 ## Safety
 
