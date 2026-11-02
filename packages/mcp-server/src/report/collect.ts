@@ -48,7 +48,8 @@ function monthBefore(month: string) {
 /**
  * Amounts per category by budget date with projected installments included,
  * mirroring `budgetSpendingByMonthQuery` in loot-core so the totals match the
- * app's overview. Unlike the overview, money with no category is counted too.
+ * app's overview. Unlike the overview, money out with no category counts too;
+ * money in without one is left out so it can't hide that spending.
  */
 async function spendingRows(months: readonly string[]): Promise<SpendingRow[]> {
   const rows: SpendingRow[] = [];
@@ -62,7 +63,12 @@ async function spendingRows(months: readonly string[]): Promise<SpendingRow[]> {
             { budget_date: { $gte: start } },
             { budget_date: { $lte: end } },
             { 'account.offbudget': false },
-            { $or: [{ category: { $ne: null } }, { transfer_id: null }] },
+            {
+              $or: [
+                { category: { $ne: null } },
+                { $and: [{ transfer_id: null }, { amount: { $lt: 0 } }] },
+              ],
+            },
           ],
         })
         .options({ splits: 'inline' })
