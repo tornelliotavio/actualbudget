@@ -71,6 +71,7 @@ function createReportMailer() {
 const report = {
   mailer: createReportMailer(),
   ignoredCategories: config.report.ignoredCategories,
+  setAsideAccounts: config.report.setAsideAccounts,
 };
 
 const app = createHttpApp({

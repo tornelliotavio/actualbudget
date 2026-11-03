@@ -23,6 +23,7 @@ const report: DailyReport = {
     paid: 10000,
     overdueCount: 1,
     cash: 207947,
+    setAside: 190905,
     leftAfterBills: -92053,
   },
   pendingBills: [
@@ -82,6 +83,7 @@ const report: DailyReport = {
     {
       name: 'Inter PF',
       isCard: false,
+      isSetAside: false,
       balance: 197728,
       bankReported: 0,
       bankDifference: 197728,
@@ -144,6 +146,17 @@ describe('composeReportEmail', () => {
     expect(html).toContain('Tudo certo &lt;hoje&gt;.');
     expect(html).not.toContain('<MT-03>');
     expect(text).toContain('Financiamento <MT-03>');
+  });
+
+  it('shows the money set aside only when there is some', () => {
+    const { text } = composeReportEmail(report, Buffer.from(''));
+    expect(text).toContain('Reservado nos cofrinhos: R$ 1.909,05');
+
+    const none = composeReportEmail(
+      { ...report, totals: { ...report.totals, setAside: 0 } },
+      Buffer.from(''),
+    );
+    expect(none.text).not.toContain('Reservado nos cofrinhos');
   });
 
   it('says how many items need the owner', () => {

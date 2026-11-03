@@ -29,6 +29,14 @@ function keyFigures({ totals }: DailyReport): [string, string][] {
         : 'Sobra depois das contas',
       formatMoney(Math.abs(totals.leftAfterBills)),
     ],
+    ...(totals.setAside > 0
+      ? [
+          ['Reservado nos cofrinhos', formatMoney(totals.setAside)] as [
+            string,
+            string,
+          ],
+        ]
+      : []),
   ];
 }
 

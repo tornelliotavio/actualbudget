@@ -48,6 +48,8 @@ export type Receipt = {
 export type ReportAccount = {
   name: string;
   isCard: boolean;
+  /** Money kept apart, not meant for this month's bills. */
+  isSetAside: boolean;
   /** For a card, with the installments still to come, as banks report it. */
   balance: number;
   /** What the bank reports, when the account is linked to one. */
@@ -67,7 +69,9 @@ export type ReportTotals = {
   toPay: number;
   paid: number;
   overdueCount: number;
+  /** What can pay this month's bills. */
   cash: number;
+  setAside: number;
   leftAfterBills: number;
 };
 

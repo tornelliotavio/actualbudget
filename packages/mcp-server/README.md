@@ -37,6 +37,7 @@ Signing in asks for a single password on a page this server renders.
 | `REPORT_EMAIL_TO`           | email    | Comma-separated recipients of the report. Fixed here so that no tool call can send the budget anywhere else. Without it, the tool reports that email is not configured.               |
 | `REPORT_EMAIL_FROM`         |          | Sender. Defaults to `SMTP_USER`, or to `Actual <onboarding@resend.dev>` with Resend, which only reaches the Resend account's own address.                                             |
 | `REPORT_IGNORED_CATEGORIES` |          | Comma-separated categories the report treats as neither spending nor income. Defaults to `Movimentações internas,Starting Balances`.                                                  |
+| `REPORT_SET_ASIDE_ACCOUNTS` |          | Comma-separated accounts kept out of what can pay this month's bills. Defaults to `Cofrinho Casamento,Cofrinho Guardado,Cofrinho 3DZone Caixa`.                                       |
 
 ## Daily report
 

@@ -34,6 +34,7 @@ export type ServerConfig = {
   };
   report: {
     ignoredCategories: string[];
+    setAsideAccounts: string[];
     email: ReportEmailConfig | null;
   };
 };
@@ -42,6 +43,12 @@ const DEFAULT_RESEND_FROM = 'Actual <onboarding@resend.dev>';
 const DEFAULT_IGNORED_CATEGORIES = [
   'Movimentações internas',
   'Starting Balances',
+];
+
+const DEFAULT_SET_ASIDE_ACCOUNTS = [
+  'Cofrinho Casamento',
+  'Cofrinho Guardado',
+  'Cofrinho 3DZone Caixa',
 ];
 
 const DEFAULT_REDIRECT_URIS = [
@@ -148,6 +155,8 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
     report: {
       ignoredCategories:
         list(env, 'REPORT_IGNORED_CATEGORIES') ?? DEFAULT_IGNORED_CATEGORIES,
+      setAsideAccounts:
+        list(env, 'REPORT_SET_ASIDE_ACCOUNTS') ?? DEFAULT_SET_ASIDE_ACCOUNTS,
       email: reportEmail(env),
     },
   };

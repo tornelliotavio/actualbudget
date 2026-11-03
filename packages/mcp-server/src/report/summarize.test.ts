@@ -5,6 +5,7 @@ import {
   pendingSchedules,
   receiptLabel,
   sortPendingBills,
+  splitCash,
   summarizeSpending,
 } from './summarize';
 import type { ScheduleInput } from './summarize';
@@ -231,6 +232,21 @@ describe('summarizeSpending', () => {
     expect(income).toEqual([{ name: 'Vendas', total: 11980, previous: 0 }]);
     expect(totals.received).toBe(11980);
     expect(totals.spent).toBe(0);
+  });
+});
+
+describe('splitCash', () => {
+  it('counts every account as available except the ones set aside', () => {
+    expect(
+      splitCash(
+        [
+          { name: 'Inter MEI', balance: 700000 },
+          { name: 'Cofrinho Carro', balance: 100000 },
+          { name: 'Cofrinho Casamento', balance: 190905 },
+        ],
+        ['cofrinho casamento', 'Cofrinho Guardado'],
+      ),
+    ).toEqual({ cash: 800000, setAside: 190905 });
   });
 });
 

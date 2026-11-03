@@ -13,6 +13,7 @@ import {
   pendingSchedules,
   receiptLabel,
   sortPendingBills,
+  splitCash,
   summarizeSpending,
 } from './summarize';
 import type { CardBillInput, SpendingRow } from './summarize';
@@ -31,6 +32,8 @@ export type CollectOptions = {
   today: string;
   /** Categories that only move money around, kept out of the totals. */
   ignoredCategories: readonly string[];
+  /** Accounts whose money isn't meant for this month's bills. */
+  setAsideAccounts: readonly string[];
 };
 
 function monthBounds(month: string) {
@@ -129,7 +132,9 @@ async function collectReceipts(
 
 function describeAccounts(
   accounts: Awaited<ReturnType<typeof loadAccountBalances>>,
+  setAsideAccounts: readonly string[],
 ): ReportAccount[] {
+  const setAside = new Set(setAsideAccounts.map(n => n.toLocaleLowerCase()));
   return accounts
     .filter(account => !account.offbudget)
     .map(account => {
@@ -141,6 +146,7 @@ function describeAccounts(
       return {
         name: account.name,
         isCard,
+        isSetAside: setAside.has(account.name.toLocaleLowerCase()),
         balance: compared,
         bankReported: account.account_sync_source ? account.bankReported : null,
         bankDifference:
@@ -154,7 +160,7 @@ function describeAccounts(
 /** Everything the daily report shows. Run inside a budget session. */
 export async function collectReport(
   lib: Lib,
-  { today, ignoredCategories }: CollectOptions,
+  { today, ignoredCategories, setAsideAccounts }: CollectOptions,
 ): Promise<ReportData> {
   const month = today.slice(0, 7);
   const previousMonth = monthBefore(month);
@@ -303,9 +309,10 @@ export async function collectReport(
       .filter(receipt => receipt.kind === kind)
       .reduce((sum, receipt) => sum + receipt.amount, 0);
 
-  const cash = balances
-    .filter(a => cashAccounts.has(a.id))
-    .reduce((sum, a) => sum + a.balance, 0);
+  const { cash, setAside } = splitCash(
+    balances.filter(a => cashAccounts.has(a.id)),
+    setAsideAccounts,
+  );
   const toPay = pendingBills.reduce((sum, bill) => sum + bill.amount, 0);
 
   return {
@@ -322,6 +329,7 @@ export async function collectReport(
       overdueCount: pendingBills.filter(bill => bill.status === 'overdue')
         .length,
       cash,
+      setAside,
       leftAfterBills: cash - toPay,
     },
     pendingBills,
@@ -333,6 +341,6 @@ export async function collectReport(
     spending,
     income,
     ...limitReceipts(allReceipts, RECEIPTS_SHOWN),
-    accounts: describeAccounts(balances),
+    accounts: describeAccounts(balances, setAsideAccounts),
   };
 }

@@ -213,6 +213,20 @@ export function summarizeSpending({
   };
 }
 
+/** Splits money in hand into what can pay bills and what is kept apart. */
+export function splitCash(
+  accounts: readonly { name: string; balance: number }[],
+  setAsideAccounts: readonly string[],
+) {
+  const setAside = new Set(setAsideAccounts.map(n => n.toLocaleLowerCase()));
+  const isSetAside = (name: string) => setAside.has(name.toLocaleLowerCase());
+  const total = (wanted: boolean) =>
+    accounts
+      .filter(account => isSetAside(account.name) === wanted)
+      .reduce((sum, account) => sum + account.balance, 0);
+  return { cash: total(false), setAside: total(true) };
+}
+
 /** Pix keys and tax ids make poor names; the bank description has the person. */
 export function receiptLabel(payee: string | null, notes: string | null) {
   if (payee && !/^[\d./-]+$/.test(payee)) return payee;

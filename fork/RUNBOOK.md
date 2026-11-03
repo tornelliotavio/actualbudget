@@ -196,6 +196,11 @@ Set these on `actual-mcp` in the dashboard (see
 | `SMTP_PASSWORD`   | _secret_, the mailbox password                     |
 | `REPORT_EMAIL_TO` | The owner's address                                |
 
+Mercado Pago's reported balance leaves out its savings boxes (cofrinhos), so
+each box is a local on-budget account, and rules turn "Dinheiro reservado/retirado
+X" into a transfer to it. Boxes count as money for the month's bills unless
+listed in `REPORT_SET_ASIDE_ACCOUNTS`.
+
 `get_change_history` shows each report: emailed, not configured, or the reason
 it failed.
 

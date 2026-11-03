@@ -13,6 +13,7 @@ export type ToolContext = {
     /** Null when email isn't configured. */
     mailer: Mailer | null;
     ignoredCategories: readonly string[];
+    setAsideAccounts: readonly string[];
   };
 };
 

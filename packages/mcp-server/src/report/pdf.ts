@@ -16,6 +16,7 @@ import {
 import type {
   DailyReport,
   PendingBill,
+  ReportAccount,
   ReportBillStatus,
   ReportCard,
   SpendingLine,
@@ -386,7 +387,7 @@ function drawTiles(canvas: Canvas, report: DailyReport) {
     {
       label: isShort ? 'Falta depois das contas' : 'Sobra depois das contas',
       value: formatMoney(Math.abs(totals.leftAfterBills)),
-      note: `Em conta: ${formatMoney(totals.cash)}`,
+      note: `Disponível: ${formatMoney(totals.cash)}`,
     },
   ];
   tiles.forEach((tile, index) => {
@@ -705,10 +706,15 @@ function drawIncome(canvas: Canvas, report: DailyReport) {
   }
 }
 
+function unlinkedLabel({ isCard, isSetAside }: ReportAccount) {
+  if (isSetAside) return 'Reservado';
+  return isCard ? 'Sem banco' : 'Para as contas';
+}
+
 function drawAccounts(canvas: Canvas, report: DailyReport) {
   canvas.section(
     'Saldo das contas',
-    'Comparado com o que o banco informou na última sincronização.',
+    `Disponível para as contas: ${formatMoney(report.totals.cash)}. Reservado: ${formatMoney(report.totals.setAside)}.`,
     (report.accounts.length + 1) * ROW_HEIGHT,
   );
   canvas.table(
@@ -727,7 +733,7 @@ function drawAccounts(canvas: Canvas, report: DailyReport) {
         formatMoney(account.balance),
         isLinked ? formatMoney(account.bankReported ?? 0) : '—',
         !isLinked
-          ? { text: 'Sem banco', style: { color: MUTED } }
+          ? { text: unlinkedLabel(account), style: { color: MUTED } }
           : matches
             ? { text: 'Confere', dot: GOOD }
             : {

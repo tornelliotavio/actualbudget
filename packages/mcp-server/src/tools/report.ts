@@ -16,6 +16,7 @@ function describeTotals({ totals }: DailyReport) {
     paid: toAmount(totals.paid),
     overdue_bills: totals.overdueCount,
     cash: toAmount(totals.cash),
+    set_aside: toAmount(totals.setAside),
     left_after_bills: toAmount(totals.leftAfterBills),
   };
 }
@@ -71,6 +72,7 @@ export const registerReportDeliveryTools: ToolRegistrar = (server, ctx) => {
         return collectReport(lib, {
           today: currentDay(),
           ignoredCategories: ctx.report.ignoredCategories,
+          setAsideAccounts: ctx.report.setAsideAccounts,
         });
       });
       const report = { ...data, notes: { summary, corrections, questions } };
