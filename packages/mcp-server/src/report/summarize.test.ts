@@ -1,11 +1,16 @@
 import { formatMoney } from './format';
 import {
+  billReminders,
+  groupAmounts,
   limitReceipts,
+  partOf,
   pendingCardBills,
   pendingSchedules,
   receiptLabel,
+  shareOf,
   sortPendingBills,
   splitCash,
+  spreadOver,
   summarizeSpending,
 } from './summarize';
 import type { ScheduleInput } from './summarize';
@@ -29,6 +34,8 @@ function schedule(overrides: Partial<ScheduleInput>): ScheduleInput {
     amount: -140000,
     amountOp: 'is',
     paidDates: [],
+    share: 1,
+    category: 'rent',
     ...overrides,
   };
 }
@@ -43,8 +50,19 @@ describe('pendingSchedules', () => {
         kind: 'schedule',
         isEstimate: false,
         status: 'scheduled',
+        share: 1,
+        category: 'rent',
       },
     ]);
+  });
+
+  it("counts only the owner's part of a split bill", () => {
+    const [bill] = pendingSchedules(
+      [schedule({ amount: -150000, share: 0.5 })],
+      today,
+      monthEnd,
+    );
+    expect(bill).toMatchObject({ amount: 75000, share: 0.5 });
   });
 
   it('keeps a bill missed last month, as overdue', () => {
@@ -95,6 +113,7 @@ describe('pendingCardBills', () => {
     dueDate: '2026-11-13',
     status: 'closed',
     due: 42390,
+    share: 1,
   };
 
   it('names the card and leaves out what is paid or due later', () => {
@@ -127,6 +146,127 @@ describe('pendingCardBills', () => {
     expect(open.status).toBe('open');
     expect(late.status).toBe('overdue');
   });
+
+  it("counts only the owner's part of a shared card", () => {
+    const [shared] = pendingCardBills(
+      [{ ...bill, due: 87980, share: 0.5 }],
+      today,
+      monthEnd,
+    );
+    expect(shared).toMatchObject({ amount: 43990, share: 0.5 });
+  });
+});
+
+describe('shareOf', () => {
+  const shares = [
+    { match: 'Aluguel', share: 0.5 },
+    { match: 'cartão riachuelo', share: 0.5 },
+  ];
+
+  it('finds the part by a piece of the name, ignoring case', () => {
+    expect(shareOf('Moradia • Aluguel (Marcelo)', shares)).toBe(0.5);
+    expect(shareOf('Cartão Riachuelo', shares)).toBe(0.5);
+  });
+
+  it('is all of it when no rule matches', () => {
+    expect(shareOf('Financiamento MT-03', shares)).toBe(1);
+    expect(shareOf('Aluguel', [])).toBe(1);
+  });
+});
+
+describe('partOf', () => {
+  it('rounds half away from zero on both signs', () => {
+    expect(partOf(87981, 0.5)).toBe(43991);
+    expect(partOf(-87981, 0.5)).toBe(-43991);
+    expect(partOf(-1599, 1)).toBe(-1599);
+  });
+});
+
+describe('spreadOver', () => {
+  it('leaves amounts that already add up alone', () => {
+    expect(spreadOver(300, [100, 200])).toEqual([100, 200]);
+  });
+
+  it('scales to the total, the rounding on the largest', () => {
+    const spread = spreadOver(100, [33, 33, 34]);
+    expect(spread.reduce((a, b) => a + b, 0)).toBe(100);
+    expect(spreadOver(50, [100, 300])).toEqual([13, 37]);
+  });
+
+  it('puts the total on the first when the amounts cancel out', () => {
+    expect(spreadOver(500, [100, -100])).toEqual([500, 0]);
+    expect(spreadOver(500, [])).toEqual([]);
+  });
+});
+
+describe('billReminders', () => {
+  const bill = {
+    name: 'Energia',
+    kind: 'schedule' as const,
+    isEstimate: false,
+    status: 'scheduled' as const,
+    amount: 86009,
+    share: 1,
+    category: null,
+  };
+
+  it('splits bills into overdue, due today and due tomorrow', () => {
+    const reminders = billReminders(
+      [
+        { ...bill, dueDate: '2026-11-01' },
+        { ...bill, dueDate: '2026-11-02' },
+        { ...bill, dueDate: '2026-11-03' },
+        { ...bill, dueDate: '2026-11-04' },
+      ],
+      today,
+    );
+    expect(reminders.overdue.map(b => b.dueDate)).toEqual(['2026-11-01']);
+    expect(reminders.today.map(b => b.dueDate)).toEqual(['2026-11-02']);
+    expect(reminders.tomorrow.map(b => b.dueDate)).toEqual(['2026-11-03']);
+  });
+});
+
+describe('groupAmounts', () => {
+  const groups = [
+    { id: 'car', name: 'Transporte', isIncome: false },
+    { id: 'home', name: 'Moradia', isIncome: false },
+  ];
+  const categories = [
+    { id: 'onix', name: 'Financiamento Onix', group: 'car' },
+    { id: 'fuel', name: 'Combustível Onix', group: 'car' },
+    { id: 'rent', name: 'Aluguel', group: 'home' },
+  ];
+
+  it('groups like the budget, largest first, the unknown apart', () => {
+    expect(
+      groupAmounts(
+        [
+          { category: 'rent', amount: 75000 },
+          { category: 'onix', amount: 109000 },
+          { category: 'fuel', amount: 5000 },
+          { category: null, amount: 1810 },
+          { category: 'gone', amount: 190 },
+        ],
+        categories,
+        groups,
+      ),
+    ).toEqual([
+      {
+        name: 'Transporte',
+        total: 114000,
+        categories: [
+          { name: 'Financiamento Onix', total: 109000 },
+          { name: 'Combustível Onix', total: 5000 },
+        ],
+      },
+      {
+        name: 'Moradia',
+        total: 75000,
+        categories: [{ name: 'Aluguel', total: 75000 }],
+      },
+      { name: 'Sem categoria', total: 2000, categories: [] },
+    ]);
+  });
 });
 
 describe('sortPendingBills', () => {
@@ -136,6 +276,8 @@ describe('sortPendingBills', () => {
       kind: 'card' as const,
       isEstimate: false,
       status: 'open' as const,
+      share: 1,
+      category: null,
     };
     const sorted = sortPendingBills([
       { ...base, dueDate: '2026-11-13', amount: 100 },

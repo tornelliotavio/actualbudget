@@ -4,6 +4,7 @@ import type { AuditLog } from '#audit';
 import type { BudgetSession } from '#budget';
 import type { JobReport } from '#jobs';
 import type { Mailer } from '#report/mailer';
+import type { ReportShare } from '#report/types';
 
 export type ToolContext = {
   session: BudgetSession;
@@ -14,6 +15,7 @@ export type ToolContext = {
     mailer: Mailer | null;
     ignoredCategories: readonly string[];
     setAsideAccounts: readonly string[];
+    shares: readonly ReportShare[];
   };
 };
 

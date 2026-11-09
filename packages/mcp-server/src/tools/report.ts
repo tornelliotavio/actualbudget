@@ -73,6 +73,7 @@ export const registerReportDeliveryTools: ToolRegistrar = (server, ctx) => {
           today: currentDay(),
           ignoredCategories: ctx.report.ignoredCategories,
           setAsideAccounts: ctx.report.setAsideAccounts,
+          shares: ctx.report.shares,
         });
       });
       const report = { ...data, notes: { summary, corrections, questions } };

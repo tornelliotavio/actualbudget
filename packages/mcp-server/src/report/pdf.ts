@@ -10,16 +10,17 @@ import {
   formatLongDate,
   formatMoney,
   formatMonth,
+  formatShare,
   formatShortMonth,
   plural,
 } from './format';
 import type {
+  AmountGroup,
   DailyReport,
   PendingBill,
   ReportAccount,
   ReportBillStatus,
   ReportCard,
-  SpendingLine,
 } from './types';
 
 const PAGE_WIDTH = 595.28;
@@ -385,7 +386,7 @@ function drawTiles(canvas: Canvas, report: DailyReport) {
           : `Pago: ${formatMoney(totals.paid)}`,
     },
     {
-      label: isShort ? 'Falta depois das contas' : 'Sobra depois das contas',
+      label: isShort ? 'Falta no fim do mês' : 'Sobra no fim do mês',
       value: formatMoney(Math.abs(totals.leftAfterBills)),
       note: `Disponível: ${formatMoney(totals.cash)}`,
     },
@@ -407,11 +408,76 @@ function billStatusLabel(bill: PendingBill, today: string) {
   return BILL_STATUS_LABELS[bill.status];
 }
 
+const BILL_COLUMNS: Column[] = [
+  { width: 48 },
+  { width: 238 },
+  { width: 92 },
+  { width: 37 },
+  { width: 92.28, align: 'right' },
+];
+
+function billTable(
+  canvas: Canvas,
+  bills: readonly PendingBill[],
+  today: string,
+) {
+  canvas.table(
+    BILL_COLUMNS,
+    ['Vence', 'Conta', 'Situação', 'Parte', 'Valor'],
+    bills.map(bill => [
+      formatDay(bill.dueDate),
+      bill.name,
+      {
+        text: billStatusLabel(bill, today),
+        dot: STATUS_DOTS[bill.status],
+      },
+      bill.share === 1
+        ? ''
+        : {
+            text: `${Math.round(bill.share * 100)}%`,
+            style: { color: SECONDARY },
+          },
+      `${bill.isEstimate ? '~ ' : ''}${formatMoney(bill.amount)}`,
+    ]),
+  );
+}
+
+/** What can't wait: due today, overdue, or due tomorrow. */
+function drawReminders(canvas: Canvas, report: DailyReport) {
+  const { overdue, today, tomorrow } = report.reminders;
+  const bills = [...overdue, ...today, ...tomorrow];
+  if (bills.length === 0) return;
+  const total = (list: readonly PendingBill[]) =>
+    formatMoney(list.reduce((sum, bill) => sum + bill.amount, 0));
+  const title =
+    today.length > 0
+      ? `Vence hoje: ${total(today)}`
+      : overdue.length > 0
+        ? `Atrasado: ${total(overdue)}`
+        : `Vence amanhã: ${total(tomorrow)}`;
+  const parts = [
+    overdue.length > 0 && today.length > 0
+      ? `${plural(overdue.length, 'conta atrasada', 'contas atrasadas')} (${total(overdue)})`
+      : null,
+    tomorrow.length > 0 && (today.length > 0 || overdue.length > 0)
+      ? `amanhã vence${tomorrow.length > 1 ? 'm' : ''} ${total(tomorrow)}`
+      : null,
+  ].filter(Boolean);
+  canvas.section(
+    title,
+    parts.length > 0
+      ? capitalize(`${parts.join(' e ')}.`)
+      : 'Só a sua parte nas contas divididas.',
+    (bills.length + 1) * ROW_HEIGHT,
+  );
+  billTable(canvas, bills, report.today);
+}
+
 function drawPendingBills(canvas: Canvas, report: DailyReport) {
   const { pendingBills, totals } = report;
   canvas.section(
     `Falta pagar em ${formatMonth(report.month)}`,
-    'Faturas e contas agendadas ainda sem pagamento, incluindo as atrasadas.',
+    'Faturas e contas agendadas ainda sem pagamento, com as atrasadas. Nas contas divididas, só a sua parte.',
   );
   if (pendingBills.length === 0) {
     canvas.paragraph('Tudo pago neste mês.', MARGIN, CONTENT_WIDTH, {
@@ -419,27 +485,9 @@ function drawPendingBills(canvas: Canvas, report: DailyReport) {
     });
     return;
   }
-  const columns: Column[] = [
-    { width: 48 },
-    { width: 275 },
-    { width: 92 },
-    { width: 92.28, align: 'right' },
-  ];
-  canvas.table(
-    columns,
-    ['Vence', 'Conta', 'Situação', 'Valor'],
-    pendingBills.map(bill => [
-      formatDay(bill.dueDate),
-      bill.name,
-      {
-        text: billStatusLabel(bill, report.today),
-        dot: STATUS_DOTS[bill.status],
-      },
-      `${bill.isEstimate ? '~ ' : ''}${formatMoney(bill.amount)}`,
-    ]),
-  );
+  billTable(canvas, pendingBills, report.today);
   canvas.ensure(ROW_HEIGHT);
-  canvas.row(columns, ['', 'Total', '', formatMoney(totals.toPay)], {
+  canvas.row(BILL_COLUMNS, ['', 'Total', '', '', formatMoney(totals.toPay)], {
     font: 'semibold',
   });
   if (pendingBills.some(bill => bill.isEstimate)) {
@@ -476,9 +524,17 @@ function cardCells(card: ReportCard): Cell[] {
 
 function drawCards(canvas: Canvas, report: DailyReport) {
   if (report.cards.length === 0) return;
+  const shared = report.cards
+    .filter(card => card.share !== 1)
+    .map(
+      card =>
+        `${card.name.replace(/^Cartão\s+/i, '')} (${formatShare(card.share)})`,
+    );
   canvas.section(
     'Faturas dos cartões',
-    'A fatura em que cada cartão está agora.',
+    shared.length > 0
+      ? `A fatura em que cada cartão está agora. Só a sua parte: ${shared.join(', ')}.`
+      : 'A fatura em que cada cartão está agora.',
   );
   canvas.table(
     [
@@ -510,6 +566,44 @@ function drawCards(canvas: Canvas, report: DailyReport) {
   }
 }
 
+function drawBillItems(canvas: Canvas, report: DailyReport) {
+  const { billItems } = report;
+  if (billItems.length === 0) return;
+  canvas.section(
+    'O que tem nas faturas',
+    `Cada lançamento das faturas que vencem em ${formatMonth(report.month)}, com as parcelas previstas. Nas faturas divididas, só a sua parte.`,
+    ROW_HEIGHT * 4,
+  );
+  const columns: Column[] = [
+    { width: 44 },
+    { width: 236 },
+    { width: 135 },
+    { width: 92.28, align: 'right' },
+  ];
+  const rows: Cell[][] = [];
+  for (const bill of new Set(billItems.map(item => item.bill))) {
+    const items = billItems.filter(item => item.bill === bill);
+    const total = items.reduce((sum, item) => sum + item.amount, 0);
+    rows.push([
+      { text: formatDay(items[0].dueDate), style: { font: 'semibold' } },
+      { text: bill, style: { font: 'semibold' } },
+      '',
+      { text: formatMoney(total), style: { font: 'semibold' } },
+    ]);
+    for (const item of items) {
+      rows.push([
+        { text: formatDay(item.date), style: { color: MUTED } },
+        item.label,
+        item.category
+          ? { text: item.category, style: { color: SECONDARY } }
+          : { text: 'Sem categoria', style: { color: MUTED } },
+        formatSpent(item.amount),
+      ]);
+    }
+  }
+  canvas.table(columns, ['Data', 'Lançamento', 'Categoria', 'Valor'], rows);
+}
+
 /** Money back in a category shows as a credit, not as negative spending. */
 function formatSpent(amount: number) {
   return amount < 0 ? `+ ${formatMoney(-amount)}` : formatMoney(amount);
@@ -517,7 +611,7 @@ function formatSpent(amount: number) {
 
 function drawSpendingRow(
   canvas: Canvas,
-  entry: SpendingLine,
+  entry: { name: string; total: number; previous?: number },
   scale: number,
   { isGroup }: { isGroup: boolean },
 ) {
@@ -550,26 +644,62 @@ function drawSpendingRow(
     align: 'right',
     tabular: true,
   });
-  canvas.line(
-    formatSpent(entry.previous),
-    amountX + amountWidth,
-    top,
-    previousWidth,
-    {
-      size: 8.5,
-      color: MUTED,
-      align: 'right',
-      tabular: true,
-    },
-  );
+  if (entry.previous != null) {
+    canvas.line(
+      formatSpent(entry.previous),
+      amountX + amountWidth,
+      top,
+      previousWidth,
+      {
+        size: 8.5,
+        color: MUTED,
+        align: 'right',
+        tabular: true,
+      },
+    );
+  }
   canvas.y += isGroup ? 20 : 17.5;
+}
+
+function barScale(groups: readonly AmountGroup[]) {
+  return Math.max(
+    1,
+    ...groups.flatMap(group => [
+      ...(group.categories.length === 0 ? [group.total] : []),
+      ...group.categories.map(category => category.total),
+    ]),
+  );
+}
+
+function drawToPayByCategory(canvas: Canvas, report: DailyReport) {
+  const groups = report.toPayByCategory;
+  if (groups.length === 0) return;
+  const [largest] = groups;
+  const share =
+    report.totals.toPay > 0 ? largest.total / report.totals.toPay : 0;
+  canvas.section(
+    `Falta pagar por categoria: ${largest.name} é ${Math.round(share * 100)}%`,
+    'As contas pela categoria do último pagamento e as faturas pelo que tem nelas.',
+    120,
+  );
+  const scale = barScale(groups);
+  for (const group of groups) {
+    canvas.ensure(40);
+    drawSpendingRow(canvas, group, scale, { isGroup: true });
+    for (const category of group.categories) {
+      canvas.ensure(18);
+      drawSpendingRow(canvas, category, scale, { isGroup: false });
+    }
+    canvas.rule(canvas.y + 1);
+    canvas.y += 3;
+  }
 }
 
 function drawSpending(canvas: Canvas, report: DailyReport) {
   const { spending, totals } = report;
   canvas.section(
     'Gastos por categoria',
-    `Pelo mês da fatura, como no Painel, com as parcelas já previstas. Total: ${formatMoney(totals.spent)}.`,
+    `Pelo mês da fatura, como no Painel, com as parcelas previstas e só a sua parte nas contas divididas. Total: ${formatMoney(totals.spent)}.`,
     120,
   );
   if (spending.length === 0) {
@@ -583,13 +713,7 @@ function drawSpending(canvas: Canvas, report: DailyReport) {
     );
     return;
   }
-  const scale = Math.max(
-    1,
-    ...spending.flatMap(group => [
-      ...(group.categories.length === 0 ? [group.total] : []),
-      ...group.categories.map(category => category.total),
-    ]),
-  );
+  const scale = barScale(spending);
   const drawColumns = () => {
     const style = { size: 8, font: 'medium' as const, color: MUTED };
     canvas.line(
@@ -842,8 +966,11 @@ export function renderReportPdf(report: DailyReport): Promise<Buffer> {
     const canvas = createCanvas(doc);
     drawHeader(canvas, report);
     drawTiles(canvas, report);
+    drawReminders(canvas, report);
     drawPendingBills(canvas, report);
+    drawToPayByCategory(canvas, report);
     drawCards(canvas, report);
+    drawBillItems(canvas, report);
     drawSpending(canvas, report);
     drawIncome(canvas, report);
     drawAccounts(canvas, report);

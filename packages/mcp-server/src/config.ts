@@ -1,5 +1,7 @@
 import path from 'path';
 
+import type { ReportShare } from '#report/types';
+
 export type ReportEmailConfig =
   | {
       kind: 'smtp';
@@ -35,6 +37,7 @@ export type ServerConfig = {
   report: {
     ignoredCategories: string[];
     setAsideAccounts: string[];
+    shares: ReportShare[];
     email: ReportEmailConfig | null;
   };
 };
@@ -49,6 +52,12 @@ const DEFAULT_SET_ASIDE_ACCOUNTS = [
   'Cofrinho Casamento',
   'Cofrinho Guardado',
   'Cofrinho 3DZone Caixa',
+];
+
+const DEFAULT_SHARES: ReportShare[] = [
+  { match: 'Aluguel', share: 0.5 },
+  { match: 'Financiamento Onix', share: 0.5 },
+  { match: 'Cartão Riachuelo', share: 0.5 },
 ];
 
 const DEFAULT_REDIRECT_URIS = [
@@ -95,6 +104,26 @@ function list(env: NodeJS.ProcessEnv, name: string): string[] | undefined {
     .split(',')
     .map(s => s.trim())
     .filter(Boolean);
+}
+
+/** `Aluguel=50%,Cartão Riachuelo=50%`: the owner's part of each split bill. */
+function shares(env: NodeJS.ProcessEnv): ReportShare[] | undefined {
+  return list(env, 'REPORT_SHARES')?.map(entry => {
+    const separator = entry.lastIndexOf('=');
+    const match = entry.slice(0, separator).trim();
+    const percent = Number(
+      entry
+        .slice(separator + 1)
+        .trim()
+        .replace(/%$/, ''),
+    );
+    if (!match || !(percent > 0 && percent <= 100)) {
+      throw new Error(
+        `REPORT_SHARES entries look like "Aluguel=50%", got "${entry}"`,
+      );
+    }
+    return { match, share: percent / 100 };
+  });
 }
 
 function reportEmail(env: NodeJS.ProcessEnv): ReportEmailConfig | null {
@@ -157,6 +186,7 @@ export function loadConfig(env: NodeJS.ProcessEnv = process.env): ServerConfig {
         list(env, 'REPORT_IGNORED_CATEGORIES') ?? DEFAULT_IGNORED_CATEGORIES,
       setAsideAccounts:
         list(env, 'REPORT_SET_ASIDE_ACCOUNTS') ?? DEFAULT_SET_ASIDE_ACCOUNTS,
+      shares: shares(env) ?? DEFAULT_SHARES,
       email: reportEmail(env),
     },
   };

@@ -72,6 +72,7 @@ const report = {
   mailer: createReportMailer(),
   ignoredCategories: config.report.ignoredCategories,
   setAsideAccounts: config.report.setAsideAccounts,
+  shares: config.report.shares,
 };
 
 const app = createHttpApp({

@@ -14,40 +14,44 @@ Signing in asks for a single password on a page this server renders.
 
 ## Configuration
 
-| Variable                    | Required | Description                                                                                                                                                                           |
-| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| `ACTUAL_SERVER_URL`         | yes      | Sync server URL.                                                                                                                                                                      |
-| `ACTUAL_PASSWORD`           | yes      | Sync server password.                                                                                                                                                                 |
-| `ACTUAL_SYNC_ID`            |          | Budget sync ID. Optional when the server holds exactly one budget.                                                                                                                    |
-| `MCP_PUBLIC_URL`            | prod     | Public base URL, used as the OAuth issuer. Defaults to `http://localhost:$PORT`.                                                                                                      |
-| `MCP_AUTH_PASSWORD`         |          | Password for the sign-in page. Defaults to `ACTUAL_PASSWORD`.                                                                                                                         |
-| `MCP_ALLOWED_REDIRECT_URIS` |          | Comma-separated OAuth redirect URIs clients may register; an entry ending in `/*` matches that path prefix. Defaults to the Claude and ChatGPT callbacks; loopback is always allowed. |
-| `MCP_DATA_DIR`              |          | Budget cache, backups, audit log and OAuth state. Defaults to `./data`; `/data` in the Docker image.                                                                                  |
-| `PORT`                      |          | Defaults to `5007`.                                                                                                                                                                   |
-| `MCP_SYNC_TTL_SECONDS`      |          | How long reads reuse the local copy before syncing. Defaults to `30`.                                                                                                                 |
-| `MCP_DAILY_JOB`             |          | Daily backup plus bank sync. Defaults to `true`.                                                                                                                                      |
-| `MCP_DAILY_JOB_HOUR`        |          | Local hour it runs at (set `TZ`). Defaults to `6`.                                                                                                                                    |
-| `MCP_DAILY_BANK_SYNC`       |          | Include bank sync in the daily job. Defaults to `true`.                                                                                                                               |
-| `MCP_BACKUP_RETENTION`      |          | Backups kept. Defaults to `14`.                                                                                                                                                       |
-| `SMTP_HOST`                 |          | SMTP server for `send_daily_report`. Takes precedence over Resend.                                                                                                                    |
-| `SMTP_PORT`                 |          | Defaults to `465` (implicit TLS); any other port must offer STARTTLS.                                                                                                                 |
-| `SMTP_USER`                 | SMTP     | Mailbox to log in with. Also the default sender.                                                                                                                                      |
-| `SMTP_PASSWORD`             | SMTP     | Its password.                                                                                                                                                                         |
-| `RESEND_API_KEY`            |          | [Resend](https://resend.com) key, used when `SMTP_HOST` is unset.                                                                                                                     |
-| `REPORT_EMAIL_TO`           | email    | Comma-separated recipients of the report. Fixed here so that no tool call can send the budget anywhere else. Without it, the tool reports that email is not configured.               |
-| `REPORT_EMAIL_FROM`         |          | Sender. Defaults to `SMTP_USER`, or to `Actual <onboarding@resend.dev>` with Resend, which only reaches the Resend account's own address.                                             |
-| `REPORT_IGNORED_CATEGORIES` |          | Comma-separated categories the report treats as neither spending nor income. Defaults to `Movimentações internas,Starting Balances`.                                                  |
-| `REPORT_SET_ASIDE_ACCOUNTS` |          | Comma-separated accounts kept out of what can pay this month's bills. Defaults to `Cofrinho Casamento,Cofrinho Guardado,Cofrinho 3DZone Caixa`.                                       |
+| Variable                    | Required | Description                                                                                                                                                                                                                                 |
+| --------------------------- | -------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `ACTUAL_SERVER_URL`         | yes      | Sync server URL.                                                                                                                                                                                                                            |
+| `ACTUAL_PASSWORD`           | yes      | Sync server password.                                                                                                                                                                                                                       |
+| `ACTUAL_SYNC_ID`            |          | Budget sync ID. Optional when the server holds exactly one budget.                                                                                                                                                                          |
+| `MCP_PUBLIC_URL`            | prod     | Public base URL, used as the OAuth issuer. Defaults to `http://localhost:$PORT`.                                                                                                                                                            |
+| `MCP_AUTH_PASSWORD`         |          | Password for the sign-in page. Defaults to `ACTUAL_PASSWORD`.                                                                                                                                                                               |
+| `MCP_ALLOWED_REDIRECT_URIS` |          | Comma-separated OAuth redirect URIs clients may register; an entry ending in `/*` matches that path prefix. Defaults to the Claude and ChatGPT callbacks; loopback is always allowed.                                                       |
+| `MCP_DATA_DIR`              |          | Budget cache, backups, audit log and OAuth state. Defaults to `./data`; `/data` in the Docker image.                                                                                                                                        |
+| `PORT`                      |          | Defaults to `5007`.                                                                                                                                                                                                                         |
+| `MCP_SYNC_TTL_SECONDS`      |          | How long reads reuse the local copy before syncing. Defaults to `30`.                                                                                                                                                                       |
+| `MCP_DAILY_JOB`             |          | Daily backup plus bank sync. Defaults to `true`.                                                                                                                                                                                            |
+| `MCP_DAILY_JOB_HOUR`        |          | Local hour it runs at (set `TZ`). Defaults to `6`.                                                                                                                                                                                          |
+| `MCP_DAILY_BANK_SYNC`       |          | Include bank sync in the daily job. Defaults to `true`.                                                                                                                                                                                     |
+| `MCP_BACKUP_RETENTION`      |          | Backups kept. Defaults to `14`.                                                                                                                                                                                                             |
+| `SMTP_HOST`                 |          | SMTP server for `send_daily_report`. Takes precedence over Resend.                                                                                                                                                                          |
+| `SMTP_PORT`                 |          | Defaults to `465` (implicit TLS); any other port must offer STARTTLS.                                                                                                                                                                       |
+| `SMTP_USER`                 | SMTP     | Mailbox to log in with. Also the default sender.                                                                                                                                                                                            |
+| `SMTP_PASSWORD`             | SMTP     | Its password.                                                                                                                                                                                                                               |
+| `RESEND_API_KEY`            |          | [Resend](https://resend.com) key, used when `SMTP_HOST` is unset.                                                                                                                                                                           |
+| `REPORT_EMAIL_TO`           | email    | Comma-separated recipients of the report. Fixed here so that no tool call can send the budget anywhere else. Without it, the tool reports that email is not configured.                                                                     |
+| `REPORT_EMAIL_FROM`         |          | Sender. Defaults to `SMTP_USER`, or to `Actual <onboarding@resend.dev>` with Resend, which only reaches the Resend account's own address.                                                                                                   |
+| `REPORT_IGNORED_CATEGORIES` |          | Comma-separated categories the report treats as neither spending nor income. Defaults to `Movimentações internas,Starting Balances`.                                                                                                        |
+| `REPORT_SET_ASIDE_ACCOUNTS` |          | Comma-separated accounts kept out of what can pay this month's bills. Defaults to `Cofrinho Casamento,Cofrinho Guardado,Cofrinho 3DZone Caixa`.                                                                                             |
+| `REPORT_SHARES`             |          | Comma-separated `name=percent` for bills split with someone: a schedule or credit card whose name contains `name` counts only that percent everywhere in the report. Defaults to `Aluguel=50%,Financiamento Onix=50%,Cartão Riachuelo=50%`. |
 
 ## Daily report
 
 `send_daily_report` builds a PDF and emails it over SMTP or, without
 `SMTP_HOST`, through Resend's HTTPS API: spending by category, what was received, bills and card bills left to pay this
-month, and account balances. The numbers are computed here, from the budget,
-with the rules of the app's overview (`fork/home/README.md`), so they match what
-the app shows. The caller only adds what happened today: a summary, the
-corrections made and the questions for the owner. `dry_run` returns the data
-without sending anything.
+month, what's left to pay by category with each card bill's charges, and
+account balances. The numbers are computed here, from the budget, with the rules
+of the app's overview (`fork/home/README.md`), so they match what the app shows,
+except that split bills (`REPORT_SHARES`) count only the owner's part. A bill
+due today or overdue goes on top of the PDF and the email and into the subject;
+one due tomorrow is listed too. The caller only adds what happened today: a
+summary, the corrections made and the questions for the owner. `dry_run`
+returns the data without sending anything.
 
 ## Safety
 

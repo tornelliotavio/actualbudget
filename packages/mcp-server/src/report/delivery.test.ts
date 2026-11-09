@@ -34,6 +34,8 @@ const report: DailyReport = {
       kind: 'schedule',
       isEstimate: false,
       status: 'overdue',
+      share: 1,
+      category: 'moto',
     },
     {
       name: 'Fatura Cartão Renner',
@@ -42,6 +44,40 @@ const report: DailyReport = {
       kind: 'card',
       isEstimate: true,
       status: 'scheduled',
+      share: 1,
+      category: null,
+    },
+  ],
+  reminders: { overdue: [], today: [], tomorrow: [] },
+  toPayByCategory: [
+    {
+      name: 'Transporte',
+      total: 100735,
+      categories: [{ name: 'Financiamento MT-03', total: 100735 }],
+    },
+    {
+      name: 'Trabalho',
+      total: 40000,
+      categories: [{ name: 'Investimentos', total: 40000 }],
+    },
+    { name: 'Sem categoria', total: 2390, categories: [] },
+  ],
+  billItems: [
+    {
+      bill: 'Fatura Cartão Renner',
+      dueDate: '2026-11-13',
+      date: '2026-09-30',
+      label: 'J MAHFUZ 9/10',
+      category: 'Investimentos',
+      amount: 40000,
+    },
+    {
+      bill: 'Fatura Cartão Renner',
+      dueDate: '2026-11-13',
+      date: '2026-09-28',
+      label: 'ANUIDADE Int',
+      category: null,
+      amount: 2390,
     },
   ],
   cards: [
@@ -53,6 +89,7 @@ const report: DailyReport = {
       total: 42390,
       paid: 0,
       due: 42390,
+      share: 1,
       limitTotal: 1000000,
       limitUsed: 87170,
     },
@@ -108,6 +145,8 @@ describe('renderReportPdf', () => {
     const pdf = await renderReportPdf({
       ...report,
       pendingBills: [],
+      toPayByCategory: [],
+      billItems: [],
       cards: [],
       dueByMonth: [],
       spending: [],
@@ -115,6 +154,19 @@ describe('renderReportPdf', () => {
       receipts: [],
       accounts: [],
       notes: { corrections: [], questions: [] },
+    });
+    expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
+  });
+
+  it('renders the bills due today, overdue and tomorrow', async () => {
+    const [overdue, renner] = report.pendingBills;
+    const pdf = await renderReportPdf({
+      ...report,
+      reminders: {
+        overdue: [overdue],
+        today: [{ ...renner, dueDate: report.today, share: 0.5 }],
+        tomorrow: [{ ...renner, dueDate: '2026-11-03' }],
+      },
     });
     expect(pdf.subarray(0, 5).toString()).toBe('%PDF-');
   });
@@ -138,6 +190,50 @@ describe('composeReportEmail', () => {
     expect(attachments).toEqual([
       { filename: 'resumo-financeiro-2026-11-02.pdf', content: pdf },
     ]);
+  });
+
+  it('puts what is due today and overdue in the subject and on top', () => {
+    const [overdue, renner] = report.pendingBills;
+    const dueToday = {
+      ...renner,
+      name: 'Fatura Cartão Riachuelo',
+      dueDate: report.today,
+      amount: 43990,
+      share: 0.5,
+    };
+    const { subject, text, html } = composeReportEmail(
+      {
+        ...report,
+        pendingBills: [overdue, dueToday, renner],
+        reminders: { overdue: [overdue], today: [dueToday], tomorrow: [] },
+      },
+      Buffer.from(''),
+    );
+    expect(subject).toBe(
+      'Vence hoje: Fatura Cartão Riachuelo, R$ 439,90 · 1 conta atrasada · Resumo 02/11',
+    );
+    expect(text.indexOf('Vence hoje: R$ 439,90')).toBeLessThan(
+      text.indexOf('Falta pagar (sua parte)'),
+    );
+    expect(text).toContain(
+      '02/11 Fatura Cartão Riachuelo (metade): ~ R$ 439,90',
+    );
+    expect(text).toContain('Atrasado: R$ 1.007,35');
+    expect(text.match(/Financiamento <MT-03>/g)).toHaveLength(1);
+    expect(html).toContain('Vence hoje: R$ 439,90');
+  });
+
+  it('counts several bills due today together', () => {
+    const [, renner] = report.pendingBills;
+    const today = [
+      { ...renner, dueDate: report.today },
+      { ...renner, dueDate: report.today, amount: 10000 },
+    ];
+    const { subject } = composeReportEmail(
+      { ...report, reminders: { overdue: [], today, tomorrow: [] } },
+      Buffer.from(''),
+    );
+    expect(subject).toBe('Vencem hoje 2 contas, R$ 523,90 · Resumo 02/11');
   });
 
   it('escapes bank and assistant text in the HTML', () => {
@@ -323,5 +419,30 @@ describe('report email configuration', () => {
       from: 'Actual <onboarding@resend.dev>',
       to: ['a@example.com'],
     });
+  });
+});
+
+describe('report shares configuration', () => {
+  const base = { ACTUAL_PASSWORD: 'x', ACTUAL_SERVER_URL: 'http://localhost' };
+
+  it('reads each bill and its percent', () => {
+    expect(
+      loadConfig({
+        ...base,
+        REPORT_SHARES: 'Aluguel=50%, Cartão Riachuelo=30.5, Onix=100',
+      }).report.shares,
+    ).toEqual([
+      { match: 'Aluguel', share: 0.5 },
+      { match: 'Cartão Riachuelo', share: 0.305 },
+      { match: 'Onix', share: 1 },
+    ]);
+  });
+
+  it('rejects an entry without a usable percent', () => {
+    for (const entry of ['Aluguel', '=50%', 'Aluguel=0', 'Aluguel=120%']) {
+      expect(() => loadConfig({ ...base, REPORT_SHARES: entry })).toThrow(
+        'REPORT_SHARES',
+      );
+    }
   });
 });

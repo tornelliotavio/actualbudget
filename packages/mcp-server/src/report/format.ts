@@ -54,6 +54,11 @@ export function plural(count: number, one: string, many: string) {
   return `${count} ${count === 1 ? one : many}`;
 }
 
+/** The owner's part of a split bill: metade, 30%. */
+export function formatShare(share: number) {
+  return share === 0.5 ? 'metade' : `${Math.round(share * 100)}%`;
+}
+
 export function daysUntil(from: string, to: string) {
   return Math.round(
     (atNoon(to).getTime() - atNoon(from).getTime()) / 86_400_000,

@@ -201,6 +201,12 @@ each box is a local on-budget account, and rules turn "Dinheiro reservado/retira
 X" into a transfer to it. Boxes count as money for the month's bills unless
 listed in `REPORT_SET_ASIDE_ACCOUNTS`.
 
+The report counts only the owner's part of split bills: half the rent, half the
+Onix financing and half the Riachuelo card, from `REPORT_SHARES`. The match is
+on the schedule's or the card account's name, so renaming one of them in the app
+needs the variable updated too. A bill due that day is put in the email's
+subject.
+
 `get_change_history` shows each report: emailed, not configured, or the reason
 it failed.
 

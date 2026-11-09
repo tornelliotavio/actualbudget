@@ -5,7 +5,14 @@ export type ReportBillStatus =
   | 'open'
   | 'scheduled';
 
-/** A bill still to pay this month, in positive cents. */
+/**
+ * A bill split with someone else: schedules whose name contains `match`, and
+ * credit cards whose account name contains it, count only `share` of their
+ * amounts (0.5 for half).
+ */
+export type ReportShare = { match: string; share: number };
+
+/** A bill still to pay this month, in positive cents of the owner's part. */
 export type PendingBill = {
   name: string;
   dueDate: string;
@@ -13,9 +20,30 @@ export type PendingBill = {
   kind: 'card' | 'schedule';
   isEstimate: boolean;
   status: ReportBillStatus;
+  /** The owner's part of the bill, 1 when it isn't split. */
+  share: number;
+  /** For a schedule, the category id of its last payment. */
+  category: string | null;
 };
 
-/** The bill a card is on now. */
+/** The bills to remind the owner of. */
+export type BillReminders = {
+  overdue: PendingBill[];
+  today: PendingBill[];
+  tomorrow: PendingBill[];
+};
+
+/** A charge on a card bill still to pay this month, owner's part. */
+export type BillItem = {
+  bill: string;
+  dueDate: string;
+  date: string;
+  label: string;
+  category: string | null;
+  amount: number;
+};
+
+/** The bill a card is on now, owner's part. */
 export type ReportCard = {
   name: string;
   referenceMonth: string;
@@ -24,6 +52,7 @@ export type ReportCard = {
   total: number;
   paid: number;
   due: number;
+  share: number;
   limitTotal: number | null;
   limitUsed: number | null;
 };
@@ -33,6 +62,10 @@ export type MonthAmount = { month: string; amount: number };
 /** `total` and `previous` are positive when money went out. */
 export type SpendingLine = { name: string; total: number; previous: number };
 export type SpendingGroup = SpendingLine & { categories: SpendingLine[] };
+
+/** `total` is positive when money goes out. */
+export type AmountLine = { name: string; total: number };
+export type AmountGroup = AmountLine & { categories: AmountLine[] };
 
 export type IncomeLine = { name: string; total: number; previous: number };
 
@@ -82,6 +115,10 @@ export type ReportData = {
   previousMonth: string;
   totals: ReportTotals;
   pendingBills: PendingBill[];
+  reminders: BillReminders;
+  /** What's left to pay by category, card bills split into their charges. */
+  toPayByCategory: AmountGroup[];
+  billItems: BillItem[];
   cards: ReportCard[];
   dueByMonth: MonthAmount[];
   spending: SpendingGroup[];

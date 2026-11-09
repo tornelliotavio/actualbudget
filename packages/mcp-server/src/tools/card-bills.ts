@@ -68,7 +68,7 @@ export async function loadCards(lib: Lib) {
     const result = await lib.send('credit-card-bills', {
       accountId: account.id,
     });
-    cards.push({ account: account.name, result });
+    cards.push({ account: account.name, accountId: account.id, result });
   }
   return cards;
 }
