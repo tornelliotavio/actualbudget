@@ -148,19 +148,52 @@ async function sharedSpendingAdjustments(
   return rows;
 }
 
-/** The category of each schedule's latest categorized payment. */
+/**
+ * The category of each schedule's latest categorized payment. A split
+ * payment only links its parent, so it takes the category of its first part
+ * as the app lists it: a shared bill's split puts the owner's part first.
+ */
 async function lastPaymentCategories(): Promise<Map<string, string>> {
-  const { data } = (await api.aqlQuery(
+  const { data: payments } = (await api.aqlQuery(
     api
       .q('transactions')
-      .filter({ schedule: { $ne: null }, category: { $ne: null } })
-      .select(['schedule', 'category', 'date'])
+      .filter({ schedule: { $ne: null } })
+      .select(['id', 'schedule', 'category', 'is_parent'])
       .options({ splits: 'none' })
       .orderBy({ date: 'desc' }),
-  )) as { data: { schedule: string; category: string }[] };
+  )) as {
+    data: {
+      id: string;
+      schedule: string;
+      category: string | null;
+      is_parent: boolean;
+    }[];
+  };
+  const parents = payments.filter(p => p.is_parent).map(p => p.id);
+  const firstPart = new Map<string, string>();
+  if (parents.length > 0) {
+    const { data: parts } = (await api.aqlQuery(
+      api
+        .q('transactions')
+        .filter({ parent_id: { $oneof: parents }, category: { $ne: null } })
+        .select(['parent_id', 'category'])
+        .options({ splits: 'all' })
+        .orderBy({ sort_order: 'desc' }),
+    )) as { data: { parent_id: string; category: string }[] };
+    for (const part of parts) {
+      if (!firstPart.has(part.parent_id)) {
+        firstPart.set(part.parent_id, part.category);
+      }
+    }
+  }
+
   const categories = new Map<string, string>();
-  for (const { schedule, category } of data) {
-    if (!categories.has(schedule)) categories.set(schedule, category);
+  for (const payment of payments) {
+    if (categories.has(payment.schedule)) continue;
+    const category = payment.is_parent
+      ? firstPart.get(payment.id)
+      : payment.category;
+    if (category) categories.set(payment.schedule, category);
   }
   return categories;
 }
@@ -171,7 +204,9 @@ type PendingCardBill = {
   referenceMonth: string;
   dueDate: string;
   share: number;
-  /** The owner's part of what's left to pay. */
+  /** What's left to pay on the whole bill. */
+  fullDue: number;
+  /** The owner's part of it. */
   due: number;
 };
 
@@ -219,10 +254,14 @@ async function cardBillCharges(
       }[];
     };
 
-    const charges = data.map(row => ({
-      row,
-      amount: partOf(-row.amount, bill.share),
-    }));
+    // Halving each charge on its own would round the bill a cent away from
+    // halving the bill, so the owner's part of the whole is spread instead.
+    const fullListed = data.reduce((sum, row) => sum - row.amount, 0);
+    const owned = spreadOver(
+      partOf(fullListed, bill.share),
+      data.map(row => partOf(-row.amount, bill.share)),
+    );
+    const charges = data.map((row, index) => ({ row, amount: owned[index] }));
     for (const { row, amount } of charges) {
       const installment =
         row.installment_number && row.installment_count
@@ -237,14 +276,14 @@ async function cardBillCharges(
         amount,
       });
     }
-    const listed = charges.reduce((sum, charge) => sum + charge.amount, 0);
-    if (listed !== bill.due) {
+    if (fullListed !== bill.fullDue) {
+      const listed = charges.reduce((sum, charge) => sum + charge.amount, 0);
       items.push({
         bill: bill.name,
         dueDate: bill.dueDate,
         date: bill.dueDate,
         label:
-          listed > bill.due
+          fullListed > bill.fullDue
             ? 'Já pago desta fatura'
             : 'Outros lançamentos da fatura',
         category: null,
@@ -445,6 +484,7 @@ export async function collectReport(
           referenceMonth: bill.referenceMonth,
           dueDate: bill.effectiveDueDate,
           share,
+          fullDue: due,
           due: partOf(due, share),
         });
       }
