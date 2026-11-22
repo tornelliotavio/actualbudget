@@ -124,8 +124,6 @@ export const pluggyaiService = {
     }
   },
 
-  getClient: fileId => getPluggyClient(fileId),
-
   getItemById: async (itemId, fileId) => {
     try {
       const client = getPluggyClient(fileId);
