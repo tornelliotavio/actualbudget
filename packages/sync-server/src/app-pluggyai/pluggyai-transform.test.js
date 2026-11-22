@@ -1,6 +1,7 @@
 import {
   flattenObject,
   isoDate,
+  isSavingsBoxMirror,
   mergeTransactions,
   toActualBill,
   toActualCreditData,
@@ -148,5 +149,83 @@ describe('pluggy transform', () => {
       a,
       { id: '2', amount: 3 },
     ]);
+  });
+
+  describe('savings box mirrors', () => {
+    function move(overrides) {
+      return {
+        id: 'm1',
+        type: 'DEBIT',
+        amount: -1007.35,
+        status: 'POSTED',
+        date: new Date('2026-11-17T03:00:00.000Z'),
+        ...overrides,
+      };
+    }
+
+    it('spots the move as the box sees it', () => {
+      expect(
+        isSavingsBoxMirror(
+          move({
+            description: 'Dinheiro retirado',
+            descriptionRaw: 'Dinheiro retirado',
+            operationType: 'OUTROS',
+            operationTypeAdditionalInfo: 'Dinheiro retirado',
+          }),
+        ),
+      ).toBe(true);
+      expect(
+        isSavingsBoxMirror(
+          move({
+            type: 'CREDIT',
+            amount: 1010,
+            description: 'Dinheiro reservado',
+            descriptionRaw: 'Dinheiro reservado',
+            operationType: 'OUTROS',
+            operationTypeAdditionalInfo: 'Dinheiro reservado',
+          }),
+        ),
+      ).toBe(true);
+    });
+
+    it("keeps the account's own side of the move", () => {
+      expect(
+        isSavingsBoxMirror(
+          move({
+            type: 'CREDIT',
+            amount: 1007.35,
+            description: 'Dinheiro retirado Moto',
+            descriptionRaw: 'Dinheiro retirado Moto',
+            operationType: 'TRANSFERENCIA_SALDO_RESERVADO',
+          }),
+        ),
+      ).toBe(false);
+      expect(
+        isSavingsBoxMirror(
+          move({
+            description: 'Dinheiro retirado Moto',
+            operationType: 'OUTROS',
+            operationTypeAdditionalInfo: 'Dinheiro retirado',
+          }),
+        ),
+      ).toBe(false);
+    });
+
+    it('keeps other transactions', () => {
+      expect(
+        isSavingsBoxMirror(
+          move({
+            description: 'Rendimentos',
+            operationType: 'RESGATE_APLIC_FINANCEIRA',
+          }),
+        ),
+      ).toBe(false);
+      expect(
+        isSavingsBoxMirror(
+          move({ description: 'Pagamento com Pix TNT', operationType: 'PIX' }),
+        ),
+      ).toBe(false);
+      expect(isSavingsBoxMirror(cardInstallment())).toBe(false);
+    });
   });
 });

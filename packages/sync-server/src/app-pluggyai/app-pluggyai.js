@@ -13,6 +13,7 @@ import { isValidFileId } from '#util/paths';
 import { pluggyaiService } from './pluggyai-service';
 import {
   getDate,
+  isSavingsBoxMirror,
   toActualBill,
   toActualCreditData,
   toActualTransaction,
@@ -201,6 +202,9 @@ app.post(
 
       for (const trans of Object.values(transactions)) {
         if (typeof trans !== 'object' || Object.keys(trans).length === 0) {
+          continue;
+        }
+        if (isSavingsBoxMirror(trans)) {
           continue;
         }
 

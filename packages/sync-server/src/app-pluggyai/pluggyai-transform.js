@@ -149,6 +149,32 @@ export function toActualCreditData(account, connector) {
   };
 }
 
+const SAVINGS_BOX_MIRRORS = new Set([
+  'Dinheiro reservado',
+  'Dinheiro retirado',
+]);
+
+/**
+ * Mercado Pago also lists a savings box ("cofrinho") move as the box sees it:
+ * "Dinheiro reservado" / "Dinheiro retirado" with no box name, the opposite
+ * amount and operation type OUTROS. The account's own side of the move comes
+ * separately ("Dinheiro retirado Moto", TRANSFERENCIA_SALDO_RESERVADO), and
+ * the mirror is not in the account balance, so importing it doubles the move.
+ */
+export function isSavingsBoxMirror(trans) {
+  const info = trans?.operationTypeAdditionalInfo?.trim();
+  const description = (
+    trans?.descriptionRaw ||
+    trans?.description ||
+    ''
+  ).trim();
+  return (
+    trans?.operationType === 'OUTROS' &&
+    SAVINGS_BOX_MIRRORS.has(info) &&
+    description === info
+  );
+}
+
 /** Transactions from several fetches, each id once, newest first. */
 export function mergeTransactions(...lists) {
   const byId = new Map();
