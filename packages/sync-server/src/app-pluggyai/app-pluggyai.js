@@ -276,6 +276,31 @@ async function probeInvestments(account, fileId) {
   const tag = '[pluggy-investments-probe]';
   try {
     const client = pluggyaiService.getClient(fileId);
+    const item = await client.fetchItem(account.itemId);
+    console.log(
+      tag,
+      JSON.stringify({
+        products: item.products,
+        connectorProducts: item.connector?.products,
+        connector: item.connector?.name,
+        isOpenFinance: item.connector?.isOpenFinance,
+      }),
+    );
+    const accounts = await client.fetchAccounts(account.itemId);
+    for (const acc of accounts.results) {
+      console.log(
+        tag,
+        'account',
+        JSON.stringify({
+          id: acc.id,
+          name: acc.name,
+          marketingName: acc.marketingName,
+          type: acc.type,
+          subtype: acc.subtype,
+          balance: acc.balance,
+        }),
+      );
+    }
     const page = await client.fetchInvestments(account.itemId);
     console.log(tag, account.name, 'investments:', page.results.length);
     for (const inv of page.results) {
