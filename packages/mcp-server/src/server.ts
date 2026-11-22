@@ -1,6 +1,7 @@
 import { McpServer } from '@modelcontextprotocol/sdk/server/mcp.js';
 
 import { registerPrompts } from './prompts';
+import { registerBankImportTools } from './tools/bank-imports';
 import { registerBudgetTools } from './tools/budget';
 import { registerCardBillTools } from './tools/card-bills';
 import { registerCategoryTools } from './tools/categories';
@@ -37,6 +38,7 @@ const REGISTRARS: ToolRegistrar[] = [
   registerReportTools,
   registerReportDeliveryTools,
   registerSyncTools,
+  registerBankImportTools,
   registerCardBillTools,
   registerHistoryTools,
 ];

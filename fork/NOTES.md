@@ -40,6 +40,19 @@ purchases authorized in the last day or two that Open Finance hasn't delivered
 yet. Compare the card balance with the open bills, never adjust a starting
 balance to match the used limit.
 
+**MercadoPago PF** keeps most of its money in savings boxes ("cofrinhos"),
+each a local account (`Cofrinho …`) fed by transfers. Since 2026-11-16 Pluggy
+also mixes each box's own statement into the account's: a mirror of every
+"Dinheiro reservado/retirado" move, the boxes' daily "Rendimentos" and bills
+paid straight from a box. None of it is in the account balance. Pluggy lists
+no investments for this item (checked 2026-11-22), and the rows carry the main
+account's id and no field that tells them apart, except the mirrors: operation
+type `OUTROS` and the description without the box's name. The sync server
+drops those (`isSavingsBoxMirror` in `app-pluggyai`). The rest is removed with
+the connector's `dismiss_bank_transactions`, which deletes the rows, records
+their ids in `bank_sync_suppressions` so the next sync doesn't bring them back,
+and refuses unless the account then matches the bank balance exactly.
+
 Credit cards are native accounts (`fork/credit-cards/`). Bills, installments
 and bill payments are derived from the Pluggy data during bank sync.
 

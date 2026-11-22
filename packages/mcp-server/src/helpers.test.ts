@@ -1,5 +1,6 @@
 import { isRedirectUriAllowed } from './auth/provider';
 import { createLoginThrottle } from './auth/throttle';
+import { dismissalLeavesBankBalance } from './tools/bank-imports';
 import { monthsBetween } from './tools/budget';
 import { describeCardBill, selectCardBills } from './tools/card-bills';
 import { replaceSection } from './tools/notebook';
@@ -224,5 +225,35 @@ describe('selectCardBills', () => {
       remaining: 275.9,
       minimum: null,
     });
+  });
+});
+
+describe('dismissalLeavesBankBalance', () => {
+  it('allows exactly the rows the bank balance does not have', () => {
+    // MercadoPago PF on 22/11: R$ -193.61 in Actual, R$ 0 at the bank.
+    expect(
+      dismissalLeavesBankBalance({
+        balance: -19361,
+        bankReported: 0,
+        dismissed: -19361,
+      }),
+    ).toBe(true);
+  });
+
+  it('refuses a partial set or one that takes a real row with it', () => {
+    expect(
+      dismissalLeavesBankBalance({
+        balance: -19361,
+        bankReported: 0,
+        dismissed: -9870,
+      }),
+    ).toBe(false);
+    expect(
+      dismissalLeavesBankBalance({
+        balance: -19361,
+        bankReported: 0,
+        dismissed: -19361 - 3089,
+      }),
+    ).toBe(false);
   });
 });

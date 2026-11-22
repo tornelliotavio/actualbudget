@@ -60,6 +60,10 @@ returns the data without sending anything.
 - The budget is exported to `backups/` before the first change each day and by
   the daily job.
 - Bulk rule application previews by default.
+- `dismiss_bank_transactions` deletes bank rows that are not part of the
+  account and blocks them from being imported again. It refuses unless the
+  account balance then equals the bank's, so it can't take a real transaction
+  with it; the audit entry keeps every dismissed row.
 
 ## Development
 
