@@ -94,7 +94,7 @@ export async function loadCardAccountState(
 export async function suppressImport(
   accountId: AccountEntity['id'],
   importedId: string,
-  reason: 'projected-deleted' | 'duplicate' | 'replaced',
+  reason: 'projected-deleted' | 'duplicate' | 'replaced' | 'dismissed',
 ) {
   const id = `${accountId}:${importedId}`;
   const existing = await db.first<{ tombstone: number }>(

@@ -47,6 +47,7 @@ import type {
   TransactionEntity,
 } from '#types/models';
 
+import { dismissImportedTransactions } from './dismiss-imported';
 import * as link from './link';
 import { getStartingBalancePayee } from './payees';
 import * as bankSync from './sync';
@@ -96,6 +97,7 @@ export type AccountHandlers = {
   'accounts-bank-sync': typeof accountsBankSync;
   'simplefin-batch-sync': typeof simpleFinBatchSync;
   'transactions-import': typeof importTransactions;
+  'transactions-dismiss-imported': typeof dismissImportedTransactions;
   'account-unlink': typeof unlinkAccount;
 };
 
@@ -1841,4 +1843,8 @@ app.method('gocardless-create-web-token', createGoCardlessWebToken);
 app.method('accounts-bank-sync', accountsBankSync);
 app.method('simplefin-batch-sync', simpleFinBatchSync);
 app.method('transactions-import', mutator(undoable(importTransactions)));
+app.method(
+  'transactions-dismiss-imported',
+  mutator(undoable(dismissImportedTransactions)),
+);
 app.method('account-unlink', mutator(unlinkAccount));
