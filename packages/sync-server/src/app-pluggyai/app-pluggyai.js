@@ -176,6 +176,9 @@ app.post(
       );
 
       const account = await pluggyaiService.getAccountById(accountId, fileId);
+      if (account.type === 'BANK') {
+        void probeInvestments(account, fileId);
+      }
 
       let startingBalance = parseInt(
         Math.round(account.balance * 100).toString(),
@@ -264,5 +267,51 @@ async function getCreditCardSnapshot(account, fileId) {
     };
   } catch (error) {
     return { error: error.message };
+  }
+}
+
+// Temporary, read-only: lists the item's investments in the logs to see
+// whether Mercado Pago savings boxes show up there.
+async function probeInvestments(account, fileId) {
+  const tag = '[pluggy-investments-probe]';
+  try {
+    const client = pluggyaiService.getClient(fileId);
+    const page = await client.fetchInvestments(account.itemId);
+    console.log(tag, account.name, 'investments:', page.results.length);
+    for (const inv of page.results) {
+      console.log(
+        tag,
+        JSON.stringify({
+          id: inv.id,
+          name: inv.name,
+          type: inv.type,
+          subtype: inv.subtype,
+          status: inv.status,
+          balance: inv.balance,
+          amount: inv.amount,
+          keys: Object.keys(inv),
+        }),
+      );
+      const txs = await client.fetchInvestmentTransactions(inv.id, {
+        dateFrom: '2026-11-14',
+      });
+      for (const t of txs.results) {
+        console.log(
+          tag,
+          inv.name,
+          JSON.stringify({
+            id: t.id,
+            date: t.date,
+            amount: t.amount,
+            value: t.value,
+            type: t.type,
+            movementType: t.movementType,
+            description: t.description,
+          }),
+        );
+      }
+    }
+  } catch (error) {
+    console.log(tag, 'failed:', error.message);
   }
 }
